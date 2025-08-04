@@ -508,7 +508,7 @@ class App:
 
         # Cria uma pasta com timestamp para a operação
         timestamp = datetime.now().strftime("%d_%m_%Y__%H_%M_%S")
-        self.dir_img = os.path.join("TT2", timestamp)
+        self.dir_img = os.path.join("output_images", timestamp)
         if not os.path.exists(self.dir_img):
             os.makedirs(self.dir_img)
 

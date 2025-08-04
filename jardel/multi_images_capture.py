@@ -7,6 +7,8 @@ import signal
 import sys
 
 # Função para tratar a interrupção com Ctrl + C
+
+
 def signal_handler(sig, frame):
     print("\n===============================================================")
     print("Interrupção detectada (Ctrl + C). Finalizando...")
@@ -14,6 +16,8 @@ def signal_handler(sig, frame):
     finalize()
 
 # Função de finalização
+
+
 def finalize():
     print("\n--- Fechando conexão... ---")
     grbl.close()
@@ -22,6 +26,8 @@ def finalize():
     sys.exit(0)
 
 # Funções existentes
+
+
 def send_grbl(cmd):
     grbl.write((cmd + "\r\n").encode())
     while True:
@@ -31,6 +37,7 @@ def send_grbl(cmd):
             if "ok" in response or "error" in response:
                 break
         time.sleep(0.01)
+
 
 def wait_for_idle():
     while True:
@@ -42,10 +49,12 @@ def wait_for_idle():
             if "<Idle" in status:
                 break
 
+
 def wait_user(msg):
     cmd = input('\n' + msg + " ( y= yes  n= no ) >> ")
     if cmd.lower() == "n":
         finalize()
+
 
 def GetImage(image_number):
     ret, frame = cam.read()
@@ -60,6 +69,8 @@ def GetImage(image_number):
     cv.imwrite(nome, frame)
 
 # Função para exibir a barra de progresso
+
+
 def print_progress(current, total, width=50):
     progress = current / total
     filled = int(width * progress)
@@ -67,8 +78,9 @@ def print_progress(current, total, width=50):
     percent = progress * 100
     print(f"Progresso: [{bar}] {percent:.1f}% ({current}/{total})")
 
+
 # Configura o diretório para salvar
-dir_img = "TT2/"
+dir_img = "output_image/"
 if not os.path.exists(dir_img):
     os.makedirs(dir_img)
 
@@ -127,11 +139,14 @@ image_counter = 1  # Começa em 1 para nomear de 001 a 120
 for repetition in range(10):  # 10 repetições
     for plant in range(12):  # 12 plantas
         print("===============================================================")
-        print(f'Repetição {repetition + 1}/10 - Planta {plant + 1}/12 - Deslocando para {ID_PLANT[plant]}')
-        send_grbl('G1 X' + str(POS_X_PLANT[plant]) + ' Y' + str(POS_Y_PLANT[plant]))
+        print(
+            f'Repetição {repetition + 1}/10 - Planta {plant + 1}/12 - Deslocando para {ID_PLANT[plant]}')
+        send_grbl(
+            'G1 X' + str(POS_X_PLANT[plant]) + ' Y' + str(POS_Y_PLANT[plant]))
         wait_for_idle()
         GetImage(image_counter)
-        print(f"Imagem capturada: {image_counter:03d}.jpg para {ID_PLANT[plant]}")
+        print(
+            f"Imagem capturada: {image_counter:03d}.jpg para {ID_PLANT[plant]}")
         print_progress(image_counter, total_images)
         image_counter += 1
 

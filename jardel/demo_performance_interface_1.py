@@ -236,7 +236,7 @@ class App:
         self.cam = None
 
         # Configura o diretório para salvar
-        dir_img = "TT2/"
+        dir_img = "output_images/"
         if not os.path.exists(dir_img):
             os.makedirs(dir_img)
 
