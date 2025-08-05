@@ -1,3 +1,0 @@
-[] Separar funções da parte gráfica 
-[] Conferir funcionalidades demo_performance
-[] 
