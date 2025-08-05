@@ -46,15 +46,22 @@ class App:
             self.selection_frame, selectmode=tk.MULTIPLE, height=15, width=20)
         self.plant_listbox.pack(fill=tk.Y)
 
-        # Carrega as plantas do JSON e popula a Listbox
+        # Carrega as plantas do JSON
         with open("cfg.json", "r") as file:
-            data = json.load(file)
-        self.ID_PLANT = [plant["id"] for plant in data["plants"]]
-        self.POS_X_PLANT = [plant["X"] for plant in data["plants"]]
-        self.POS_Y_PLANT = [plant["Y"] for plant in data["plants"]]
-        for i, plant_id in enumerate(self.ID_PLANT):
-            if plant_id != "B00":
-                self.plant_listbox.insert(tk.END, plant_id)
+            self.data_json = json.load(file)
+
+        # Adiciona opção para selecionar o Room
+        self.room_var = tk.StringVar(value="Room A")
+        self.room_label = ttk.Label(self.selection_frame, text="Selecione o Room:")
+        self.room_label.pack(anchor=tk.W, pady=(10, 0))
+        self.room_combo = ttk.Combobox(
+            self.selection_frame, textvariable=self.room_var, state="readonly",
+            values=["Room A", "Room B"]
+        )
+        self.room_combo.pack(fill=tk.X, pady=(0, 10))
+        self.room_combo.bind("<<ComboboxSelected>>", self.update_plants_list)
+
+        self.update_plants_list()
 
         # Frame para progresso e botões (centro)
         self.control_frame = ttk.Frame(self.main_frame)
@@ -96,6 +103,16 @@ class App:
 
         # Registra o manipulador de sinal na thread principal
         signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(self, sig, frame))
+
+    def update_plants_list(self, event=None):
+        room_key = self.room_var.get()
+        plants = self.data_json[room_key]
+        self.ID_PLANT = [plant["id"] for plant in plants]
+        self.POS_X_PLANT = [plant["X"] for plant in plants]
+        self.POS_Y_PLANT = [plant["Y"] for plant in plants]
+        self.plant_listbox.delete(0, tk.END)
+        for plant in plants:
+            self.plant_listbox.insert(tk.END, plant['id'])
 
 if __name__ == "__main__":
     root = tk.Tk()
