@@ -1,15 +1,37 @@
+# Verifica se o Python está disponível
+$pythonExists = $false
+try {
+    $ver = python --version 2>&1
+    if ($LASTEXITCODE -eq 0 -and $ver -match "Python") {
+        $pythonExists = $true
+    }
+} catch {
+    $pythonExists = $false
+}
+if (-not $pythonExists) {
+    Write-Host "Python não foi encontrado no sistema. Instale o Python e adicione ao PATH antes de continuar."
+    exit 1
+}
 # Script PowerShell para criar e instalar dependências do projeto Python
 # Execute este script na raiz do projeto
 
-
-# Pergunta ao usuário sobre criar e ativar a venv, mas só pergunta sobre ativar se não estiver ativa
-$venvAction = $false
+# Verifica se a venv existe
+$venvPath = ".venv"
 $venvActive = $env:VIRTUAL_ENV -ne $null -and $env:VIRTUAL_ENV -ne ""
-if (!(Test-Path ".venv")) {
-    $resp = Read-Host "A venv não existe. Deseja criá-la e ativar? (s/n)"
+
+
+# Criação e ativação da venv
+$activate = $false
+if (!(Test-Path $venvPath)) {
+    $resp = Read-Host "A venv não existe. Deseja criá-la? (s/n)"
     if ($resp -eq 's' -or $resp -eq 'S') {
-        python -m venv .venv
-        $venvAction = $true
+        python -m venv $venvPath
+        if (!(Test-Path "$venvPath/Scripts/Activate.ps1")) {
+            Write-Host "Falha ao criar a venv."
+            exit 1
+        }
+        Write-Host "Venv criada."
+        $activate = $true
     } else {
         Write-Host "Operação cancelada pelo usuário."
         exit
@@ -17,7 +39,7 @@ if (!(Test-Path ".venv")) {
 } elseif (-not $venvActive) {
     $resp = Read-Host "A venv já existe, mas não está ativa. Deseja ativá-la? (s/n)"
     if ($resp -eq 's' -or $resp -eq 'S') {
-        $venvAction = $true
+        $activate = $true
     } else {
         Write-Host "Operação cancelada pelo usuário."
         exit
@@ -26,8 +48,13 @@ if (!(Test-Path ".venv")) {
     Write-Host "A venv já está ativa."
 }
 
-if ($venvAction) {
-    . .venv\Scripts\Activate.ps1
+if ($activate) {
+    . .\.venv\Scripts\Activate.ps1
+    if ($env:VIRTUAL_ENV -eq $null -or $env:VIRTUAL_ENV -eq "") {
+        Write-Host "Falha ao ativar a venv."
+        exit 1
+    }
+    Write-Host "Venv ativada."
 }
 
 # Lê as dependências do cfg.json
@@ -58,7 +85,7 @@ $to_install = $table | Where-Object { $_.Status -eq "NÃO INSTALADO" } | ForEach
 if ($to_install.Count -gt 0) {
     $resp = Read-Host "Deseja instalar as dependências faltantes? (s/n)"
     if ($resp -eq 's' -or $resp -eq 'S') {
-        pip install $($to_install -join ' ')
+        pip install $to_install
     } else {
         Write-Host "Instalação de dependências cancelada pelo usuário."
     }
