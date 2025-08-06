@@ -82,8 +82,3 @@ Este trabalho desenvolve um sistema de automação para uma **máquina CNC** loc
 - [Instagram Spectral Int](https://www.instagram.com/spectral_int/)
 
 ---
-
-🌱 **"A tecnologia a serviço da agricultura do presente!"** 🌱  
-*Projeto desenvolvido em 2025 para o TCC na área de automação e agricultura de precisão.*
-
----
