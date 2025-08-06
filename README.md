@@ -1,11 +1,10 @@
 # 🤖 Automação de CNC para Fenotipagem em Agricultura de Ambiente Controlado  
-### TCC - Universidade Federal de Viçosa (UFV)  
 Bem-vindo ao projeto de automação de uma máquina CNC (Comando Numérico Computadorizado) para integrar a fenotipagem de alto rendimento no Laboratório de Agricultura em Ambiente Controlado da UFV (LAAC)!  
 
 ---
 
 ## 📝 Sobre o Projeto  
-Este trabalho de conclusão de curso desenvolve um sistema de automação para uma **máquina CNC** localizada em uma **câmara de simulação de ambientes**. O objetivo é programar a CNC para percorrer uma mesa de fenotipagem, seguindo um caminho planta a planta, capturando imagens detalhadas para análise fenotípica.  
+Este trabalho desenvolve um sistema de automação para uma **máquina CNC** localizada em uma **câmara de simulação de ambientes**. O objetivo é programar a CNC para percorrer uma mesa de fenotipagem, seguindo um caminho planta a planta, capturando imagens detalhadas para análise fenotípica.  
 
 💡 **Finalidade:**  
 - Automatizar a captura de imagens de plantas em um ambiente controlado;  
@@ -17,7 +16,6 @@ Este trabalho de conclusão de curso desenvolve um sistema de automação para u
 ## 🌟 Funcionalidades  
 - **Caminhamento Planta a Planta:** A CNC segue uma trajetória mais curta possível, visitando cada planta na mesa de fenotipagem;  
 - **Captura de Imagens:** Integração com uma câmera RGB e uma Multispectral para registrar imagens de alta qualidade;  
-- **Ambiente Controlado:** Operação dentro de uma câmara que simula condições ambientais específicas (luz, temperatura, umidade etc.);  
 - **Fenotipagem Automatizada:** As imagens capturadas são usadas para análise de características das plantas (crescimento, saúde, etc.).  
 
 ---
@@ -25,7 +23,7 @@ Este trabalho de conclusão de curso desenvolve um sistema de automação para u
 ## 🛠️ Tecnologias Utilizadas  
 | Tecnologia       | Função                          |  
 |-------------------|---------------------------------|  
-| **CNC**          | Movimento preciso na mesa       |  
+| **grbl**          | Movimento preciso na mesa       |  
 | **Arduino Mega** | Controle e programação |  
 | **Câmera**       | Captura de imagens das plantas  |  
 | **Python**       | Scripts de automação  |  
@@ -70,8 +68,7 @@ Este trabalho de conclusão de curso desenvolve um sistema de automação para u
 
 ---
 
-## 🤝 Contribuições  
-Este é um projeto acadêmico ainda fechado. No futuro, sugestões serão bem-vindas!  
+## 🤝 Contribuições   
 - Abra uma *issue* para reportar problemas ou ideias.  
 - Faça um *fork* e envie um *pull request* com melhorias.  
 
@@ -83,14 +80,6 @@ Este é um projeto acadêmico ainda fechado. No futuro, sugestões serão bem-vi
 - [Linkedin LAAC](https://www.linkedin.com/company/laac-ufv/posts/?feedView=all)
 - [Instagram LAAC](https://www.instagram.com/laac.ufv/)
 - [Instagram Spectral Int](https://www.instagram.com/spectral_int/)
-
----
-
-## 💪 Equipe  
-- **Autor:** [Aline Malta - UFV]  
-- **Orientador:** [André Coelho - UFV]
-- **Coorientador** [Jardel Fialho - UFV]
-- **Instituição:** Universidade Federal de Viçosa (UFV)  
 
 ---
 
