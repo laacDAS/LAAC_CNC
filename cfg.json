@@ -1,11 +1,11 @@
 {
-    "port": "COM3",
+    "port": "COM5",
     "baudrate": 115200,
     "Room A": [
               {
             "id": "A01",
-            "X": -142.000,
-            "Y": -1840.000
+            "X": -120.000,
+            "Y": -240.000
         },
         {
             "id": "A02",
@@ -125,4 +125,10 @@
             "Y": -150.000
         }
     ]
+,
+"python_dependencies": [
+    {"name": "pillow", "import": "PIL"},
+    {"name": "opencv-python", "import": "cv2"},
+    {"name": "pyserial", "import": "serial"}
+]
 }
