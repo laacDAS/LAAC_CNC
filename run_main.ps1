@@ -8,3 +8,6 @@ if (-not ($env:VIRTUAL_ENV -ne $null -and $env:VIRTUAL_ENV -ne "")) {
 
 # Executa o main.py
 python main.py
+
+Write-Host "`nPressione Enter para sair..."
+[void][System.Console]::ReadLine()

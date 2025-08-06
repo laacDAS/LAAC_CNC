@@ -97,3 +97,6 @@ if ($to_install.Count -gt 0) {
 pip install --upgrade pip
 
 Write-Host "\nProcesso finalizado."
+
+Write-Host "`nPressione Enter para sair..."
+[void][System.Console]::ReadLine()
