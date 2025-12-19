@@ -11,6 +11,7 @@ from functions import (
     get_image, start_process, run_process
 )
 
+
 class App:
     def __init__(self, root):
         self.root = root
@@ -52,7 +53,8 @@ class App:
 
         # Adiciona opção para selecionar o Room
         self.room_var = tk.StringVar(value="Room A")
-        self.room_label = ttk.Label(self.selection_frame, text="Selecione o Room:")
+        self.room_label = ttk.Label(
+            self.selection_frame, text="Selecione o Room:")
         self.room_label.pack(anchor=tk.W, pady=(10, 0))
         self.room_combo = ttk.Combobox(
             self.selection_frame, textvariable=self.room_var, state="readonly",
@@ -86,6 +88,15 @@ class App:
             self.button_frame, text="Cancelar", command=lambda: cancel(self), state=tk.DISABLED)
         self.cancel_button.pack(side=tk.LEFT, padx=5)
 
+        # Botão Captura Adensada
+        try:
+            from ui import adicionar_botao_captura_adensada
+            self.captura_adensada_button = adicionar_botao_captura_adensada(
+                self)
+        except Exception as e:
+            print(
+                f"[ERRO] Não foi possível adicionar o botão Captura Adensada: {e}")
+
         # Frame para visualização da imagem (direita)
         self.image_frame = ttk.Frame(self.main_frame)
         self.image_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -102,7 +113,8 @@ class App:
         self.thread = None
 
         # Registra o manipulador de sinal na thread principal
-        signal.signal(signal.SIGINT, lambda sig, frame: signal_handler(self, sig, frame))
+        signal.signal(signal.SIGINT, lambda sig,
+                      frame: signal_handler(self, sig, frame))
 
     def update_plants_list(self, event=None):
         room_key = self.room_var.get()
@@ -113,6 +125,7 @@ class App:
         self.plant_listbox.delete(0, tk.END)
         for plant in plants:
             self.plant_listbox.insert(tk.END, plant['id'])
+
 
 if __name__ == "__main__":
     root = tk.Tk()
