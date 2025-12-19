@@ -133,6 +133,7 @@
         {"name": "numpy", "import": "numpy"},
         {"name": "piexif", "import": "piexif"},
         {"name": "pandas", "import": "pandas"},
-        {"name": "matplotlib", "import": "matplotlib"}
+        {"name": "matplotlib", "import": "matplotlib"},
+        {"name": "piexif ", "import": "piexif"}
     ]
 }
