@@ -1,114 +1,4 @@
-# --- Classes utilitárias (de camera.py e cnc_controller.py) ---
-from PIL import Image
 
-class Camera:
-    def get_field_of_view_mm(self):
-        """Retorna o campo de visão da câmera em mm."""
-        return 10.0  # valor exemplo
-
-    def get_num_capturas_x(self):
-        """Retorna o número de capturas na linha (exemplo fixo)."""
-        return 10
-
-    def get_dpi(self):
-        """Retorna o DPI da imagem capturada."""
-        return 300
-
-    def capturar_imagem(self):
-        """Captura e retorna uma imagem PIL.Image (stub: imagem branca)."""
-        return Image.new('RGB', (1024, 768), color='white')
-
-class CNCController:
-    def initialize(self):
-        """Inicializa a CNC."""
-        pass
-
-    def unlock(self):
-        """Desbloqueia a CNC."""
-        pass
-
-    def home(self):
-        """Executa o homing da CNC."""
-        pass
-
-    def mover_para(self, x, y):
-        """Move a CNC para a posição (x, y)."""
-        pass
-
-    def return_to_origin(self):
-        """Retorna a CNC à posição de origem."""
-        pass
-
-# --- Funções de captura adensada (de capture_dense.py) ---
-import logging
-import piexif
-from pathlib import Path
-
-def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
-    """
-    Salva a imagem com metadados EXIF personalizados.
-    """
-    exif_dict = {
-        "0th": {
-            piexif.ImageIFD.ImageDescription: filename.encode(),
-            piexif.ImageIFD.XResolution: (dpi, 1),
-            piexif.ImageIFD.YResolution: (dpi, 1),
-        },
-        "Exif": {
-            piexif.ExifIFD.UserComment: f"X={x}, Y={y}".encode()
-        }
-    }
-    exif_bytes = piexif.dump(exif_dict)
-    img.save(filepath, "jpeg", exif=exif_bytes)
-
-def captura_adensada():
-    """
-    Executa a rotina de captura adensada:
-    1. Inicializa e desbloqueia CNC
-    2. Executa homing
-    3. Realiza capturas com alta sobreposição
-    4. Retorna CNC à origem
-    """
-    try:
-        # Inicialização dos módulos
-        cnc = CNCController()
-        camera = Camera()
-
-        logging.info("[Captura Adensada] Inicializando CNC...")
-        cnc.initialize()
-        cnc.unlock()
-        cnc.home()
-
-        # Pasta de destino
-        output_dir = Path("Fotos Adensadas")
-        output_dir.mkdir(exist_ok=True)
-
-        # Parâmetros de captura
-        field_of_view_mm = camera.get_field_of_view_mm()  # Ex: 10mm
-        step_mm = field_of_view_mm * 0.1  # 90% sobreposição
-        n_capturas = camera.get_num_capturas_x()
-        dpi = camera.get_dpi()
-
-        x, y = 0.0, 0.0
-        for i in range(n_capturas):
-            # Mover CNC
-            cnc.mover_para(x, y)
-            # Capturar imagem
-            img = camera.capturar_imagem()
-            filename = f"imagem_{i+1:03d}.jpg"
-            filepath = output_dir / filename
-            # Salvar imagem com EXIF
-            salvar_imagem_com_exif(img, filepath, filename, dpi, x, y)
-            logging.info(f"Imagem salva: {filepath} (X={x}, Y={y})")
-            # Próxima posição
-            x += step_mm
-        # Retornar à origem
-        cnc.return_to_origin()
-        logging.info("[Captura Adensada] Finalizada com sucesso.")
-    except Exception as e:
-        logging.error(f"Erro na captura adensada: {e}")
-
-# --- Funções de captura múltipla (de multi_images_capture.py) ---
 import cv2 as cv
 import serial
 import time
@@ -116,6 +6,13 @@ import os
 import json
 import signal
 import sys
+from PIL import Image
+import datetime
+import threading
+import tkinter as tk
+import tkinter.messagebox as msg
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 def multi_images_capture():
     """
@@ -245,17 +142,6 @@ def multi_images_capture():
     send_grbl('G0 X0 Y0')
     wait_for_idle()
     finalize()
-import cv2 as cv
-import serial
-import time
-import os
-import json
-import datetime
-import threading
-import tkinter as tk
-import tkinter.messagebox as msg
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 
 def log(self, message):
     self.log_text.insert('end', message + "\n")
@@ -626,3 +512,111 @@ def criar_interface_gerar_pontos(self):
         gerar_pontos_adensados(self, step)
     btn = ttk.Button(frame, text="Gerar Pontos Adensados", command=on_gerar)
     btn.pack(side=tk.LEFT)
+
+# --- Classes utilitárias (de camera.py e cnc_controller.py) ---
+class Camera:
+    def get_field_of_view_mm(self):
+        """Retorna o campo de visão da câmera em mm."""
+        return 10.0  # valor exemplo
+
+    def get_num_capturas_x(self):
+        """Retorna o número de capturas na linha (exemplo fixo)."""
+        return 10
+
+    def get_dpi(self):
+        """Retorna o DPI da imagem capturada."""
+        return 300
+
+    def capturar_imagem(self):
+        """Captura e retorna uma imagem PIL.Image (stub: imagem branca)."""
+        return Image.new('RGB', (1024, 768), color='white')
+
+class CNCController:
+    def initialize(self):
+        """Inicializa a CNC."""
+        pass
+
+    def unlock(self):
+        """Desbloqueia a CNC."""
+        pass
+
+    def home(self):
+        """Executa o homing da CNC."""
+        pass
+
+    def mover_para(self, x, y):
+        """Move a CNC para a posição (x, y)."""
+        pass
+
+    def return_to_origin(self):
+        """Retorna a CNC à posição de origem."""
+        pass
+
+# --- Funções de captura adensada (de capture_dense.py) ---
+import logging
+import piexif
+from pathlib import Path
+
+def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
+    """
+    Salva a imagem com metadados EXIF personalizados.
+    """
+    exif_dict = {
+        "0th": {
+            piexif.ImageIFD.ImageDescription: filename.encode(),
+            piexif.ImageIFD.XResolution: (dpi, 1),
+            piexif.ImageIFD.YResolution: (dpi, 1),
+        },
+        "Exif": {
+            piexif.ExifIFD.UserComment: f"X={x}, Y={y}".encode()
+        }
+    }
+    exif_bytes = piexif.dump(exif_dict)
+    img.save(filepath, "jpeg", exif=exif_bytes)
+
+def captura_adensada():
+    """
+    Executa a rotina de captura adensada:
+    1. Inicializa e desbloqueia CNC
+    2. Executa homing
+    3. Realiza capturas com alta sobreposição
+    4. Retorna CNC à origem
+    """
+    try:
+        # Inicialização dos módulos
+        cnc = CNCController()
+        camera = Camera()
+
+        logging.info("[Captura Adensada] Inicializando CNC...")
+        cnc.initialize()
+        cnc.unlock()
+        cnc.home()
+
+        # Pasta de destino
+        output_dir = Path("Fotos Adensadas")
+        output_dir.mkdir(exist_ok=True)
+
+        # Parâmetros de captura
+        field_of_view_mm = camera.get_field_of_view_mm()  # Ex: 10mm
+        step_mm = field_of_view_mm * 0.1  # 90% sobreposição
+        n_capturas = camera.get_num_capturas_x()
+        dpi = camera.get_dpi()
+
+        x, y = 0.0, 0.0
+        for i in range(n_capturas):
+            # Mover CNC
+            cnc.mover_para(x, y)
+            # Capturar imagem
+            img = camera.capturar_imagem()
+            filename = f"imagem_{i+1:03d}.jpg"
+            filepath = output_dir / filename
+            # Salvar imagem com EXIF
+            salvar_imagem_com_exif(img, filepath, filename, dpi, x, y)
+            logging.info(f"Imagem salva: {filepath} (X={x}, Y={y})")
+            # Próxima posição
+            x += step_mm
+        # Retornar à origem
+        cnc.return_to_origin()
+        logging.info("[Captura Adensada] Finalizada com sucesso.")
+    except Exception as e:
+        logging.error(f"Erro na captura adensada: {e}")
