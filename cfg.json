@@ -134,6 +134,8 @@
         {"name": "piexif", "import": "piexif"},
         {"name": "pandas", "import": "pandas"},
         {"name": "matplotlib", "import": "matplotlib"},
-        {"name": "piexif ", "import": "piexif"}
+        {"name": "piexif ", "import": "piexif"},
+        {"name": "exifread", "import": "exifread"},
+        {"name": "pyexiv2", "import": "pyexiv2"}
     ]
 }
