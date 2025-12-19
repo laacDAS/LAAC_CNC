@@ -8,7 +8,7 @@ import json
 from functions import (
     log, update_status, update_progress, update_image,
     signal_handler, cancel, finalize, send_grbl, wait_for_idle,
-    get_image, start_process, run_process
+    get_image, start_process, run_process, criar_interface_gerar_pontos
 )
 
 
@@ -17,6 +17,9 @@ class App:
         self.root = root
         self.root.title("Controle GRBL e Captura de Imagens")
         self.root.geometry("1000x700")
+
+        # Adiciona interface para geração de pontos adensados
+        criar_interface_gerar_pontos(self)
 
         # Frame principal para organizar o layout
         self.main_frame = ttk.Frame(root)
@@ -89,13 +92,13 @@ class App:
         self.cancel_button.pack(side=tk.LEFT, padx=5)
 
         # Botão Captura Adensada
-        try:
-            from ui import adicionar_botao_captura_adensada
-            self.captura_adensada_button = adicionar_botao_captura_adensada(
-                self)
-        except Exception as e:
-            print(
-                f"[ERRO] Não foi possível adicionar o botão Captura Adensada: {e}")
+        from functions import start_dense_process
+        self.captura_adensada_button = ttk.Button(
+            self.button_frame,
+            text="Captura Adensada",
+            command=lambda: start_dense_process(self)
+        )
+        self.captura_adensada_button.pack(side=tk.LEFT, padx=5)
 
         # Frame para visualização da imagem (direita)
         self.image_frame = ttk.Frame(self.main_frame)

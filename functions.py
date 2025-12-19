@@ -1,3 +1,250 @@
+# --- Classes utilitárias (de camera.py e cnc_controller.py) ---
+from PIL import Image
+
+class Camera:
+    def get_field_of_view_mm(self):
+        """Retorna o campo de visão da câmera em mm."""
+        return 10.0  # valor exemplo
+
+    def get_num_capturas_x(self):
+        """Retorna o número de capturas na linha (exemplo fixo)."""
+        return 10
+
+    def get_dpi(self):
+        """Retorna o DPI da imagem capturada."""
+        return 300
+
+    def capturar_imagem(self):
+        """Captura e retorna uma imagem PIL.Image (stub: imagem branca)."""
+        return Image.new('RGB', (1024, 768), color='white')
+
+class CNCController:
+    def initialize(self):
+        """Inicializa a CNC."""
+        pass
+
+    def unlock(self):
+        """Desbloqueia a CNC."""
+        pass
+
+    def home(self):
+        """Executa o homing da CNC."""
+        pass
+
+    def mover_para(self, x, y):
+        """Move a CNC para a posição (x, y)."""
+        pass
+
+    def return_to_origin(self):
+        """Retorna a CNC à posição de origem."""
+        pass
+
+# --- Funções de captura adensada (de capture_dense.py) ---
+import logging
+import piexif
+from pathlib import Path
+
+def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
+    """
+    Salva a imagem com metadados EXIF personalizados.
+    """
+    exif_dict = {
+        "0th": {
+            piexif.ImageIFD.ImageDescription: filename.encode(),
+            piexif.ImageIFD.XResolution: (dpi, 1),
+            piexif.ImageIFD.YResolution: (dpi, 1),
+        },
+        "Exif": {
+            piexif.ExifIFD.UserComment: f"X={x}, Y={y}".encode()
+        }
+    }
+    exif_bytes = piexif.dump(exif_dict)
+    img.save(filepath, "jpeg", exif=exif_bytes)
+
+def captura_adensada():
+    """
+    Executa a rotina de captura adensada:
+    1. Inicializa e desbloqueia CNC
+    2. Executa homing
+    3. Realiza capturas com alta sobreposição
+    4. Retorna CNC à origem
+    """
+    try:
+        # Inicialização dos módulos
+        cnc = CNCController()
+        camera = Camera()
+
+        logging.info("[Captura Adensada] Inicializando CNC...")
+        cnc.initialize()
+        cnc.unlock()
+        cnc.home()
+
+        # Pasta de destino
+        output_dir = Path("Fotos Adensadas")
+        output_dir.mkdir(exist_ok=True)
+
+        # Parâmetros de captura
+        field_of_view_mm = camera.get_field_of_view_mm()  # Ex: 10mm
+        step_mm = field_of_view_mm * 0.1  # 90% sobreposição
+        n_capturas = camera.get_num_capturas_x()
+        dpi = camera.get_dpi()
+
+        x, y = 0.0, 0.0
+        for i in range(n_capturas):
+            # Mover CNC
+            cnc.mover_para(x, y)
+            # Capturar imagem
+            img = camera.capturar_imagem()
+            filename = f"imagem_{i+1:03d}.jpg"
+            filepath = output_dir / filename
+            # Salvar imagem com EXIF
+            salvar_imagem_com_exif(img, filepath, filename, dpi, x, y)
+            logging.info(f"Imagem salva: {filepath} (X={x}, Y={y})")
+            # Próxima posição
+            x += step_mm
+        # Retornar à origem
+        cnc.return_to_origin()
+        logging.info("[Captura Adensada] Finalizada com sucesso.")
+    except Exception as e:
+        logging.error(f"Erro na captura adensada: {e}")
+
+# --- Funções de captura múltipla (de multi_images_capture.py) ---
+import cv2 as cv
+import serial
+import time
+import os
+import json
+import signal
+import sys
+
+def multi_images_capture():
+    """
+    Rotina de captura múltipla baseada em multi_images_capture.py
+    """
+    def signal_handler(sig, frame):
+        print("\n===============================================================")
+        print("Interrupção detectada (Ctrl + C). Finalizando...")
+        print("\n===============================================================")
+        finalize()
+
+    def finalize():
+        print("\n--- Fechando conexão... ---")
+        grbl.close()
+        cam.release()
+        cv.destroyAllWindows()
+        sys.exit(0)
+
+    def send_grbl(cmd):
+        grbl.write((cmd + "\r\n").encode())
+        while True:
+            if grbl.inWaiting() > 0:
+                response = grbl.readline().decode().strip()
+                print("GRBL:", response)
+                if "ok" in response or "error" in response:
+                    break
+            time.sleep(0.01)
+
+    def wait_for_idle():
+        while True:
+            grbl.write(b"?")
+            time.sleep(0.1)
+            if grbl.inWaiting() > 0:
+                status = grbl.readline().decode().strip()
+                print("Status:", status)
+                if "<Idle" in status:
+                    break
+
+    def wait_user(msg):
+        cmd = input('\n' + msg + " ( y= yes  n= no ) >> ")
+        if cmd.lower() == "n":
+            finalize()
+
+    def GetImage(image_number):
+        ret, frame = cam.read()
+        if not ret:
+            print(f"Erro ao capturar imagem {image_number:03d}")
+            return
+        frame_resized = cv.resize(frame, (640, 360))
+        if os.environ.get("DISPLAY"):
+            cv.imshow('Imagem', frame_resized)
+            cv.waitKey(30)
+        nome = dir_img + f"{image_number:03d}.jpg"  # Nome de 001 a 120
+        cv.imwrite(nome, frame)
+
+    def print_progress(current, total, width=50):
+        progress = current / total
+        filled = int(width * progress)
+        bar = '#' * filled + '-' * (width - filled)
+        percent = progress * 100
+        print(f"Progresso: [{bar}] {percent:.1f}% ({current}/{total})")
+
+    dir_img = "output_image/"
+    if not os.path.exists(dir_img):
+        os.makedirs(dir_img)
+
+    with open("cfg.json", "r") as file:
+        data = json.load(file)
+
+    PORT = data["port"]
+    BAUDRATE = data["baudrate"]
+    ID_PLANT = [plant["id"] for plant in data["plants"]]
+    POS_X_PLANT = [plant["X"] for plant in data["plants"]]
+    POS_Y_PLANT = [plant["Y"] for plant in data["plants"]]
+
+    signal.signal(signal.SIGINT, signal_handler)
+
+    print("Iniciando comunicacao GRBL...")
+    try:
+        global grbl
+        grbl = serial.Serial(PORT, BAUDRATE, timeout=1)
+        time.sleep(2)
+        grbl.write(b"\r\n\r\n")
+        time.sleep(2)
+        grbl.flushInput()
+        print("Conectado ao GRBL na porta:", PORT)
+    except Exception:
+        print("Erro ao conectar na porta:", PORT)
+        exit()
+
+    print("-> Iniciando Camera...")
+    global cam
+    cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+    if not cam.isOpened():
+        print("-> Erro ao abrir a câmera. Verifique a conexão...")
+        grbl.close()
+        exit()
+    cam.set(3, 1920)
+    cam.set(4, 1080)
+
+    print(f"Processando 12 plantas, 10 vezes cada (120 capturas)...")
+    print_progress(0, 120)
+    send_grbl('$X')
+    wait_for_idle()
+    send_grbl('$H')
+    wait_for_idle()
+    send_grbl('$')
+    send_grbl('?')
+    wait_user('-> Iniciar Captura Automatica? ')
+    send_grbl('G1 F14000')
+
+    total_images = 120
+    image_counter = 1
+    for repetition in range(10):
+        for plant in range(12):
+            print("===============================================================")
+            print(f'Repetição {repetition + 1}/10 - Planta {plant + 1}/12 - Deslocando para {ID_PLANT[plant]}')
+            send_grbl('G1 X' + str(POS_X_PLANT[plant]) + ' Y' + str(POS_Y_PLANT[plant]))
+            wait_for_idle()
+            GetImage(image_counter)
+            print(f"Imagem capturada: {image_counter:03d}.jpg para {ID_PLANT[plant]}")
+            print_progress(image_counter, total_images)
+            image_counter += 1
+
+    print_progress(total_images, total_images)
+    print("\nConcluído!")
+    send_grbl('G0 X0 Y0')
+    wait_for_idle()
+    finalize()
 import cv2 as cv
 import serial
 import time
@@ -5,6 +252,10 @@ import os
 import json
 import datetime
 import threading
+import tkinter as tk
+import tkinter.messagebox as msg
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 def log(self, message):
     self.log_text.insert('end', message + "\n")
@@ -179,3 +430,199 @@ def run_process(self, selected_indices):
     send_grbl(self, 'G0 X0 Y0')
     wait_for_idle(self)
     finalize(self)
+
+def captura_adensada_functions(self):
+    """
+    Wrapper para rotina de captura adensada, integrando logs e interface.
+    """
+    import threading
+    # from capture_dense import captura_adensada  # Removido, função agora está em functions.py
+    log(self, "Iniciando Captura Adensada...")
+    def run():
+        try:
+            captura_adensada()
+            log(self, "Captura Adensada finalizada com sucesso.")
+        except Exception as e:
+            log(self, f"Erro na Captura Adensada: {e}")
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+
+def start_dense_process(self):
+    if self.running:
+        return
+
+    log(self, "Iniciando Captura Adensada (alta sobreposição)...")
+    # Cria pasta com data/hora
+    now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    self.session_dir = os.path.join("Fotos Adensadas", now)
+    if not os.path.exists(self.session_dir):
+        os.makedirs(self.session_dir)
+    log(self, f"Imagens adensadas serão salvas em: {self.session_dir}")
+
+    self.start_button.config(state='disabled')
+    self.cancel_button.config(state='normal')
+    self.running = True
+
+    self.thread = threading.Thread(
+        target=lambda: run_dense_process(self))
+    self.thread.daemon = True
+    self.thread.start()
+
+def run_dense_process(self):
+    self.grbl = None
+    self.cam = None
+
+    with open("cfg.json", "r") as file:
+        data = json.load(file)
+
+    PORT = data["port"]
+    BAUDRATE = data["baudrate"]
+
+    log(self, "Iniciando comunicacao GRBL...")
+    try:
+        self.grbl = serial.Serial(PORT, BAUDRATE, timeout=1)
+        time.sleep(2)
+        self.grbl.write(b"\r\n\r\n")
+        time.sleep(2)
+        self.grbl.flushInput()
+        log(self, "Conectado ao GRBL na porta: " + PORT)
+    except Exception as e:
+        log(self, "Erro ao conectar na porta: " + str(e))
+        finalize(self)
+        return
+
+    log(self, "-> Iniciando Camera...")
+    self.cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+    if not self.cam.isOpened():
+        log(self, "-> Erro ao abrir a câmera. Verifique a conexão...")
+        self.grbl.close()
+        finalize(self)
+        return
+    else:
+        log(self, "-> Camera iniciada com sucesso...")
+    self.cam.set(3, 1920)
+    self.cam.set(4, 1080)
+
+
+    # Lê coordenadas do pontos.json
+    try:
+        with open("pontos.json", "r") as f:
+            pontos = json.load(f)
+    except Exception as e:
+        log(self, f"Erro ao ler pontos.json: {e}")
+        finalize(self)
+        return
+
+    if not isinstance(pontos, list) or not pontos:
+        log(self, "Nenhuma coordenada encontrada em pontos.json!")
+        finalize(self)
+        return
+
+    total_imgs = len(pontos)
+    log(self, f"Capturando {total_imgs} imagens adensadas conforme pontos.json...")
+    update_progress(self, 0, total_imgs)
+    send_grbl(self, '$X')
+    wait_for_idle(self)
+    send_grbl(self, '$H')
+    wait_for_idle(self)
+    send_grbl(self, '$')
+    send_grbl(self, '?')
+    send_grbl(self, 'G1 F14000')
+
+    img_count = 0
+    for pt in pontos:
+        if not self.running:
+            break
+        x = pt.get("X", 0.0)
+        y = pt.get("Y", 0.0)
+        log(self, f"Adensada {img_count+1} de {total_imgs} - X={x:.2f} Y={y:.2f}")
+        send_grbl(self, f'G1 X{x:.2f} Y{y:.2f}')
+        wait_for_idle(self)
+        self.cam.read()
+        time.sleep(0.1)
+        ret, frame = self.cam.read()
+        if not ret:
+            log(self, f"Erro ao capturar imagem adensada {img_count+1}")
+            continue
+        nome = os.path.join(self.session_dir, f"adensada_{img_count+1:04d}_X{x:.2f}_Y{y:.2f}.jpg")
+        cv.imwrite(nome, frame)
+        log(self, f"Imagem adensada salva: {nome}")
+        img_count += 1
+        update_progress(self, img_count, total_imgs)
+
+    update_progress(self, img_count, total_imgs)
+    log(self, "\nCaptura Adensada Concluída!")
+    send_grbl(self, 'G0 X0 Y0')
+    wait_for_idle(self)
+    finalize(self)
+
+def gerar_pontos_adensados(self, step=100):
+    """
+    Gera pontos adensados em padrão zig-zag, salva em pontos.json e mostra popup para confirmação.
+    step: espaçamento entre pontos (mm)
+    """
+    width = 900
+    length = 2000
+    points = []
+    pid = 1
+    xs = list(range(0, width + 1, step))
+    ys = list(range(0, length + 1, step))
+    for xi, x in enumerate(xs):
+        linha = []
+        y_iter = ys if xi % 2 == 0 else ys[::-1]
+        for y in y_iter:
+            linha.append({
+                "id": pid,
+                "X": float(-x),
+                "Y": float(-y)
+            })
+            pid += 1
+        points.extend(linha)
+    # Visualização: quadrado de borda preta e 'x' azul dentro
+    fig, ax = plt.subplots(figsize=(5, 10))
+    for p in points:
+        x = -p['X']
+        y = -p['Y']
+        # Quadrado de borda preta
+        rect = patches.Rectangle(
+            (x - 50, y - 50), 100, 100,
+            linewidth=2, edgecolor='black', facecolor='none', alpha=1.0
+        )
+        ax.add_patch(rect)
+        # 'X' azul
+        ax.plot([x - 40, x + 40], [y - 40, y + 40], color='blue', linewidth=2)
+        ax.plot([x - 40, x + 40], [y + 40, y - 40], color='blue', linewidth=2)
+    ax.set_xlim(-50, width + 50)
+    ax.set_ylim(-50, length + 50)
+    ax.set_aspect('auto')
+    ax.set_xlabel('X (mm)')
+    ax.set_ylabel('Y (mm)')
+    ax.set_title(f'Visualização dos Pontos Adensados ({len(points)} pontos, passo {step}mm)')
+    plt.tight_layout()
+    plt.show()
+    confirm = msg.askyesno("Confirmação de Grade", f"Grade de pontos gerada com passo {step}mm.\n\nA visualização foi exibida.\n\nDeseja salvar pontos.json?")
+    if confirm:
+        with open("pontos.json", "w") as f:
+            json.dump(points, f, indent=4)
+        msg.showinfo("Pontos Gerados", f"{len(points)} pontos salvos em pontos.json.")
+    else:
+        msg.showinfo("Cancelado", "Geração de pontos cancelada.")
+def criar_interface_gerar_pontos(self):
+    """
+    Adiciona botão e entrada para gerar pontos adensados na interface principal.
+    """
+    from tkinter import ttk
+    frame = tk.Frame(self.root)
+    frame.pack(pady=10)
+    tk.Label(frame, text="Passo (mm):").pack(side=tk.LEFT)
+    passo_entry = tk.Entry(frame, width=5)
+    passo_entry.insert(0, "100")
+    passo_entry.pack(side=tk.LEFT)
+    def on_gerar():
+        try:
+            step = int(passo_entry.get())
+        except Exception:
+            step = 100
+        gerar_pontos_adensados(self, step)
+    btn = ttk.Button(frame, text="Gerar Pontos Adensados", command=on_gerar)
+    btn.pack(side=tk.LEFT)
