@@ -432,6 +432,24 @@ def run_dense_process(self):
             continue
         nome = os.path.join(self.session_dir, f"adensada_{img_count+1:04d}_X{x:.2f}_Y{y:.2f}.jpg")
         cv.imwrite(nome, frame)
+        # Salva coordenadas X-LAT e Y-LONG no EXIF imediatamente após a captura
+        try:
+            import piexif
+            from PIL import Image
+            pil_img = Image.open(nome)
+            # Cria EXIF mínimo se não existir
+            try:
+                exif_dict = piexif.load(nome)
+            except Exception:
+                exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
+            # Concatena ambos os campos no UserComment
+            user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment.encode('utf-8')
+            exif_bytes = piexif.dump(exif_dict)
+            pil_img.save(nome, exif=exif_bytes)
+            pil_img.close()
+        except Exception as e:
+            log(self, f"Não foi possível gravar EXIF X-LAT/Y-LONG: {e}")
         log(self, f"Imagem adensada salva: {nome}")
         img_count += 1
         update_progress(self, img_count, total_imgs)
@@ -561,6 +579,8 @@ def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
     """
     Salva a imagem com metadados EXIF personalizados.
     """
+    # Formato customizado: X-LAT e Y-LONG no UserComment
+    user_comment = f"X-LAT:{x};Y-LONG:{y}"
     exif_dict = {
         "0th": {
             piexif.ImageIFD.ImageDescription: filename.encode(),
@@ -568,7 +588,7 @@ def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
             piexif.ImageIFD.YResolution: (dpi, 1),
         },
         "Exif": {
-            piexif.ExifIFD.UserComment: f"X={x}, Y={y}".encode()
+            piexif.ExifIFD.UserComment: user_comment.encode('utf-8')
         }
     }
     exif_bytes = piexif.dump(exif_dict)
