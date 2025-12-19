@@ -1,5 +1,5 @@
 {
-    "port": "COM5",
+    "port": "COM3",
     "baudrate": 115200,
     "Room A": [
               {
@@ -124,11 +124,25 @@
             "X": -812.000,
             "Y": -150.000
         }
+    ],
+    "dense_grid": [
+        {"X": 0.0, "Y": 0.0},
+        {"X": 10.0, "Y": 0.0},
+        {"X": 20.0, "Y": 0.0},
+        {"X": 0.0, "Y": 10.0},
+        {"X": 10.0, "Y": 10.0},
+        {"X": 20.0, "Y": 10.0},
+        {"X": 0.0, "Y": 20.0},
+        {"X": 10.0, "Y": 20.0},
+        {"X": 20.0, "Y": 20.0}
+    ],
+    "python_dependencies": [
+        {"name": "pillow", "import": "PIL"},
+        {"name": "opencv-python", "import": "cv2"},
+        {"name": "pyserial", "import": "serial"},
+        {"name": "numpy", "import": "numpy"},
+        {"name": "piexif", "import": "piexif"},
+        {"name": "pandas", "import": "pandas"},
+        {"name": "matplotlib", "import": "matplotlib"}
     ]
-,
-"python_dependencies": [
-    {"name": "pillow", "import": "PIL"},
-    {"name": "opencv-python", "import": "cv2"},
-    {"name": "pyserial", "import": "serial"}
-]
 }
