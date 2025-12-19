@@ -55,9 +55,8 @@ class App:
             self.data_json = json.load(file)
 
         # Adiciona opção para selecionar o Room
-        self.room_var = tk.StringVar(value="Room A")
-        self.room_label = ttk.Label(
-            self.selection_frame, text="Selecione o Room:")
+        self.room_var = tk.StringVar(value="Room B")
+        self.room_label = ttk.Label(self.selection_frame, text="Selecione o Room:")
         self.room_label.pack(anchor=tk.W, pady=(10, 0))
         self.room_combo = ttk.Combobox(
             self.selection_frame, textvariable=self.room_var, state="readonly",
