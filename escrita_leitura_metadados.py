@@ -3,276 +3,256 @@ from tkinter import filedialog, messagebox, scrolledtext, ttk
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import piexif
+import exifread
+import os
+import re
 
-class EditorEXIF:
+class VisualizadorMetadadosLimpo:
     def __init__(self, root):
         self.root = root
-        self.root.title("🖼️ Editor de Metadados EXIF + X-LAT/Y-LONG")
-        self.root.geometry("1100x750")
+        self.root.title("🔍 METADADOS COMPLETOS - FORMATO LIMPO")
+        self.root.geometry("1400x900")
         self.arquivo_selecionado = None
-        
         self.setup_ui()
     
     def setup_ui(self):
-        frame_top = ttk.Frame(self.root)
-        frame_top.pack(fill=tk.X, padx=10, pady=10)
+        # Header limpo
+        header_frame = ttk.Frame(self.root)
+        header_frame.pack(fill=tk.X, padx=15, pady=15)
         
-        ttk.Button(frame_top, text="📁 Selecionar Imagem", 
-                  command=self.selecionar_imagem).pack(side=tk.LEFT, padx=(0,10))
+        ttk.Button(header_frame, text="📁 ABRIR IMAGEM", 
+                  command=self.selecionar_imagem, width=18).pack(side=tk.LEFT)
         
-        self.label_arquivo = ttk.Label(frame_top, text="Nenhuma imagem selecionada")
-        self.label_arquivo.pack(side=tk.LEFT)
+        self.info_label = ttk.Label(header_frame, text="Selecione uma imagem...", 
+                                   font=('Segoe UI', 11, 'bold'))
+        self.info_label.pack(side=tk.LEFT, padx=(20,0))
         
-        ttk.Button(frame_top, text="🔄 Recarregar", 
-                  command=self.ler_metadados).pack(side=tk.LEFT, padx=(10,0))
+        ttk.Button(header_frame, text="🔄 ANALISAR", 
+                  command=self.analisar_tudo).pack(side=tk.RIGHT)
         
-        self.notebook = ttk.Notebook(self.root)
-        self.notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0,10))
+        # Notebook com abas organizadas
+        notebook = ttk.Notebook(self.root)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0,15))
         
-        self.frame_visualizar = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_visualizar, text="📋 Visualizar")
-        self.setup_visualizar()
+        # Aba principal formatada
+        main_frame = ttk.Frame(notebook)
+        notebook.add(main_frame, text="📋 METADADOS ORGANIZADOS")
         
-        self.frame_editar = ttk.Frame(self.notebook)
-        self.notebook.add(self.frame_editar, text="✏️ Editar")
-        self.setup_editar()
+        # Treeview para tabela limpa
+        columns = ('GRUPO', 'TAG', 'VALOR')
+        self.tree = ttk.Treeview(main_frame, columns=columns, show='headings', height=30)
+        
+        self.tree.heading('GRUPO', text='GRUPO')
+        self.tree.heading('TAG', text='TAG')
+        self.tree.heading('VALOR', text='VALOR')
+        
+        self.tree.column('GRUPO', width=150)
+        self.tree.column('TAG', width=250)
+        self.tree.column('VALOR', width=900)
+        
+        # Scrollbars
+        v_scroll = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        h_scroll = ttk.Scrollbar(main_frame, orient=tk.HORIZONTAL, command=self.tree.xview)
+        self.tree.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
+        
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,5), pady=10)
+        v_scroll.pack(side=tk.RIGHT, fill=tk.Y, pady=10)
+        h_scroll.pack(side=tk.BOTTOM, fill=tk.X, padx=(0,0), pady=(0,10))
+        
+        # Aba coordenadas
+        coords_frame = ttk.Frame(notebook)
+        notebook.add(coords_frame, text="📍 COORDENADAS CNC")
+        self.setup_coordenadas(coords_frame)
     
-    def setup_visualizar(self):
-        self.text_area = scrolledtext.ScrolledText(self.frame_visualizar, wrap=tk.WORD, height=25)
-        self.text_area.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+    def setup_coordenadas(self, parent):
+        frame = ttk.LabelFrame(parent, text="X-LAT / Y-LONG", padding=20)
+        frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+        
+        # Labels grandes
+        ttk.Label(frame, text="X-LAT:", font=('Arial', 16, 'bold')).pack(anchor='w', pady=(0,5))
+        self.entry_xlat = ttk.Entry(frame, font=('Arial', 16), width=25)
+        self.entry_xlat.pack(fill=tk.X, pady=(0,20))
+        
+        ttk.Label(frame, text="Y-LONG:", font=('Arial', 16, 'bold')).pack(anchor='w', pady=(0,5))
+        self.entry_ylong = ttk.Entry(frame, font=('Arial', 16), width=25)
+        self.entry_ylong.pack(fill=tk.X, pady=(0,20))
+        
+        btn_frame = ttk.Frame(frame)
+        btn_frame.pack(fill=tk.X)
+        ttk.Button(btn_frame, text="💾 SALVAR", command=self.salvar_coordenadas, width=20).pack(side=tk.LEFT)
+        ttk.Button(btn_frame, text="📋 COPIAR", command=self.copiar_coords, width=20).pack(side=tk.LEFT, padx=(10,0))
     
-    def setup_editar(self):
-        # Campos padrão EXIF
-        campos_padrao = [
-            ('ImageDescription', 'Descrição da Imagem'),
-            ('Make', 'Fabricante'),
-            ('Model', 'Modelo da Câmera'),
-            ('Software', 'Software'),
-            ('Artist', 'Fotógrafo'),
-            ('Copyright', 'Copyright'),
-            ('DateTime', 'Data/Hora')
-        ]
-        
-        # ✅ NOVOS CAMPOS X-LAT e Y-LONG
-        campos_coordenadas = [
-            ('X-LAT', 'Coordenada X (Latitude)'),
-            ('Y-LONG', 'Coordenada Y (Longitude)')
-        ]
-        
-        frame_campos = ttk.LabelFrame(self.frame_editar, text="Editar Campos EXIF")
-        frame_campos.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        self.entries = {}
-        
-        # Campos padrão
-        for campo_tecnico, campo_nome in campos_padrao:
-            frame_campo = ttk.Frame(frame_campos)
-            frame_campo.pack(fill=tk.X, padx=10, pady=3)
-            ttk.Label(frame_campo, text=f"{campo_nome}:", width=22).pack(side=tk.LEFT)
-            entry = ttk.Entry(frame_campo, width=50)
-            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10,0))
-            self.entries[campo_tecnico] = entry
-        
-        # ✅ SEPARADOR para coordenadas
-        ttk.Separator(frame_campos, orient='horizontal').pack(fill=tk.X, padx=10, pady=(10,5))
-        ttk.Label(frame_campos, text="📍 COORDENADAS CNC (X-LAT/Y-LONG)", 
-                 font=('Arial', 10, 'bold')).pack(pady=(5,5))
-        
-        for campo_tecnico, campo_nome in campos_coordenadas:
-            frame_campo = ttk.Frame(frame_campos)
-            frame_campo.pack(fill=tk.X, padx=10, pady=3)
-            ttk.Label(frame_campo, text=f"{campo_nome}:", width=22).pack(side=tk.LEFT)
-            entry = ttk.Entry(frame_campo, width=50)
-            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(10,0))
-            self.entries[campo_tecnico] = entry
-        
-        frame_botoes = ttk.Frame(self.frame_editar)
-        frame_botoes.pack(fill=tk.X, padx=10, pady=10)
-        
-        ttk.Button(frame_botoes, text="💾 Salvar Todos Alterados", 
-                  command=self.salvar_todos).pack(side=tk.LEFT, padx=(0,10))
-        ttk.Button(frame_botoes, text="🗑️ Limpar Todos", 
-                  command=self.limpar_todos).pack(side=tk.LEFT)
+    def limpar_tabela(self):
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+    
+    def adicionar_linha(self, grupo, tag, valor):
+        self.tree.insert('', 'end', values=(grupo, tag, valor))
     
     def selecionar_imagem(self):
         arquivo = filedialog.askopenfilename(
-            title="Selecionar Imagem",
-            filetypes=[("Imagens JPG", "*.jpg *.jpeg"), ("Todas Imagens", "*.png *.tiff *.webp *.jpg *.jpeg")]
+            filetypes=[("JPG", "*.jpg *.jpeg"), ("Todas", "*.*")]
         )
         if arquivo:
             self.arquivo_selecionado = arquivo
-            nome_arquivo = arquivo.split('/')[-1] if '/' in arquivo else arquivo.split('\\')[-1]
-            self.label_arquivo.config(text=f"✅ {nome_arquivo}")
-            self.ler_metadados()
+            nome = os.path.basename(arquivo)
+            tamanho = os.path.getsize(arquivo)
+            self.info_label.config(text=f"✅ {nome} | {tamanho:,} bytes")
+            self.analisar_tudo()
     
-    def ler_metadados(self):
+    def analisar_tudo(self):
         if not self.arquivo_selecionado:
-            messagebox.showwarning("Aviso", "Selecione uma imagem primeiro!")
             return
         
-        texto_pil = self.extrair_pil_exif(self.arquivo_selecionado)
-        metadados_piexif = self.ler_metadados_piexif(self.arquivo_selecionado)
+        self.limpar_tabela()
         
-        texto = f"📁 Arquivo: {self.arquivo_selecionado.split('\\')[-1]}\n"
-        texto += "\n=== METADADOS PIL ===\n"
-        texto += texto_pil
+        # INFO BÁSICA
+        self.adicionar_info_basica()
         
-        texto += "\n=== METADADOS PIEXIF ===\n"
-        if 'erro' not in metadados_piexif:
-            for grupo, tags in metadados_piexif.get('exif', {}).items():
-                texto += f"\n📂 {grupo}:\n"
-                for tag, valor in sorted(tags.items()):
-                    texto += f"  {tag}: {valor}\n"
+        # PIL EXIF
+        self.extrair_pil_exif()
         
-        self.text_area.delete(1.0, tk.END)
-        self.text_area.insert(tk.END, texto)
+        # PIEXIF (MAIS IMPORTANTE)
+        self.extrair_piexif_completo()
         
-        # ✅ Preenche TODOS os campos (incluindo X-LAT/Y-LONG)
-        pil_exif = self.parse_pil_exif(texto_pil)
-        piexif_exif = self.parse_piexif_exif(metadados_piexif)
-        exif_completo = {**pil_exif, **piexif_exif}
-        self.preencher_campos(exif_completo)
+        # EXIFREAD corrigido
+        self.extrair_exifread()
+        
+        # Extrair coordenadas
+        self.extrair_coordenadas()
     
-    def parse_piexif_exif(self, metadados):
-        """Extrai X-LAT e Y-LONG do piexif"""
-        exif_dict = {}
-        if 'exif' in metadados:
-            for grupo, tags in metadados['exif'].items():
-                for tag, valor in tags.items():
-                    if tag in ['X-LAT', 'Y-LONG']:
-                        exif_dict[tag] = valor
-        return exif_dict
-    
-    def extrair_pil_exif(self, caminho_imagem):
+    def adicionar_info_basica(self):
         try:
-            img = Image.open(caminho_imagem)
+            st = os.stat(self.arquivo_selecionado)
+            img = Image.open(self.arquivo_selecionado)
+            
+            self.adicionar_linha("📁 ARQUIVO", "Nome", os.path.basename(self.arquivo_selecionado))
+            self.adicionar_linha("📁 ARQUIVO", "Tamanho", f"{st.st_size:,} bytes")
+            self.adicionar_linha("📁 ARQUIVO", "Criado", datetime.fromtimestamp(st.st_ctime).strftime('%Y-%m-%d %H:%M:%S'))
+            self.adicionar_linha("📁 ARQUIVO", "Modificado", datetime.fromtimestamp(st.st_mtime).strftime('%Y-%m-%d %H:%M:%S'))
+            self.adicionar_linha("🖼️ IMAGEM", "Resolução", f"{img.size[0]}x{img.size[1]}")
+            self.adicionar_linha("🖼️ IMAGEM", "Modo", img.mode)
+            self.adicionar_linha("🖼️ IMAGEM", "Formato", img.format)
+        except:
+            pass
+    
+    def extrair_pil_exif(self):
+        try:
+            img = Image.open(self.arquivo_selecionado)
             exif = img.getexif()
-            texto = ""
             if exif:
+                self.adicionar_linha("PIL EXIF", "Total Tags", str(len(exif)))
                 for tag_id, valor in exif.items():
-                    tag = TAGS.get(tag_id, f"Tag_{tag_id}")
-                    if isinstance(valor, bytes):
-                        valor_str = valor.decode('utf-8', errors='replace')
-                    else:
-                        valor_str = str(valor)
-                    texto += f"{tag}: {valor_str}\n"
-            else:
-                texto = "Nenhum EXIF encontrado.\n"
-            return texto
-        except Exception as e:
-            return f"Erro PIL: {str(e)}\n"
+                    tag_nome = TAGS.get(tag_id, f"Tag_{tag_id}")
+                    valor_str = str(valor)
+                    self.adicionar_linha("PIL EXIF", tag_nome, valor_str)
+        except:
+            self.adicionar_linha("PIL EXIF", "Status", "Erro de leitura")
     
-    def parse_pil_exif(self, texto_pil):
-        exif_dict = {}
-        for linha in texto_pil.split('\n'):
-            if ':' in linha:
-                tag, valor = linha.split(':', 1)
-                exif_dict[tag.strip()] = valor.strip()
-        return exif_dict
-    
-    def ler_metadados_piexif(self, caminho_imagem):
+    def extrair_piexif_completo(self):
         try:
-            resultado = {'exif': {}}
-            try:
-                exif_dict = piexif.load(caminho_imagem)
-            except:
-                return resultado
+            exif_dict = piexif.load(self.arquivo_selecionado)
             
-            grupos = {
-                0: 'ImageIFD (0th)',
-                1: 'ThumbnailIFD (1st)', 
-                piexif.ExifIFD: 'ExifIFD',
-                piexif.GPSIFD: 'GPSIFD',
-                piexif.InteropIFD: 'InteropIFD'
-            }
-            
-            for ifd_id, dados in exif_dict.items():
-                if dados and ifd_id != 'thumbnail':
-                    grupo_nome = grupos.get(ifd_id, f"Grupo_{ifd_id}")
-                    resultado['exif'][grupo_nome] = {}
+            for ifd_name, ifd_data in exif_dict.items():
+                if ifd_data and ifd_name != 'thumbnail':
+                    grupo = f"PIEXIF {ifd_name}"
+                    self.adicionar_linha(grupo, "Total Tags", str(len(ifd_data)))
                     
-                    for tag_id, valor in dados.items():
+                    for tag_id, valor_raw in ifd_data.items():
                         try:
-                            tag_info = piexif.TAGS.get(ifd_id, {}).get(tag_id, f"Tag_{tag_id}")
+                            tag_info = piexif.TAGS.get(ifd_name, {}).get(tag_id, f"0x{tag_id:04x}")
                             
-                            if isinstance(valor, bytes):
-                                valor_str = valor.decode('utf-8', errors='replace')
-                            elif isinstance(valor, (tuple, list)):
-                                valor_str = str(valor)
+                            # ✅ LIMPA O VALOR
+                            if isinstance(valor_raw, bytes):
+                                try:
+                                    valor = valor_raw.decode('utf-8').strip()
+                                except:
+                                    valor = f"b'{valor_raw[:50]}...'"
+                            elif isinstance(valor_raw, (tuple, list)):
+                                valor = str(valor_raw)
                             else:
-                                valor_str = str(valor)
+                                valor = str(valor_raw)
                             
-                            resultado['exif'][grupo_nome][tag_info] = valor_str
+                            self.adicionar_linha(grupo, tag_info, valor)
                         except:
                             continue
-            return resultado
         except Exception as e:
-            return {'erro': str(e)}
+            self.adicionar_linha("PIEXIF", "Erro", str(e))
     
-    def preencher_campos(self, exif_dict):
-        for campo, entry in self.entries.items():
-            valor = exif_dict.get(campo, '')
-            entry.delete(0, tk.END)
-            entry.insert(0, valor)
+    def extrair_exifread(self):
+        # ✅ CORRIGIDO: remove stop_tagdict
+        try:
+            with open(self.arquivo_selecionado, 'rb') as f:
+                tags = exifread.process_file(f)  # Sem parâmetro problemático
+            if tags:
+                self.adicionar_linha("EXIFREAD", "Total Tags", str(len(tags)))
+                for tag_name in sorted(tags.keys()):
+                    valor = str(tags[tag_name])
+                    self.adicionar_linha("EXIFREAD", tag_name, valor)
+        except Exception as e:
+            self.adicionar_linha("EXIFREAD", "Erro", str(e))
     
-    def limpar_todos(self):
-        for entry in self.entries.values():
-            entry.delete(0, tk.END)
+    def extrair_coordenadas(self):
+        try:
+            exif_dict = piexif.load(self.arquivo_selecionado)
+            
+            # Procura X-LAT e Y-LONG no UserComment
+            if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
+                comentario = exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8', errors='ignore')
+                
+                # Extrai coordenadas
+                x_match = re.search(r'X[-_]?LAT[:\s]*([-\d.]+)', comentario, re.IGNORECASE)
+                y_match = re.search(r'Y[-_]?LONG[:\s]*([-\d.]+)', comentario, re.IGNORECASE)
+                
+                if x_match:
+                    self.entry_xlat.delete(0, tk.END)
+                    self.entry_xlat.insert(0, x_match.group(1))
+                
+                if y_match:
+                    self.entry_ylong.delete(0, tk.END)
+                    self.entry_ylong.insert(0, y_match.group(1))
+                    
+                self.adicionar_linha("📍 COORDENADAS", "X-LAT", x_match.group(1) if x_match else "N/A")
+                self.adicionar_linha("📍 COORDENADAS", "Y-LONG", y_match.group(1) if y_match else "N/A")
+                
+        except:
+            pass
     
-    def salvar_todos(self):
-        if not self.arquivo_selecionado:
-            messagebox.showwarning("Aviso", "Selecione uma imagem primeiro!")
+    def salvar_coordenadas(self):
+        xlat = self.entry_xlat.get().strip()
+        ylong = self.entry_ylong.get().strip()
+        
+        if not xlat or not ylong:
+            messagebox.showwarning("AVISO", "Preencha ambas coordenadas!")
             return
         
-        alterados = 0
-        for campo, entry in self.entries.items():
-            valor = entry.get().strip()
-            resultado = self.escrever_campo_exif(self.arquivo_selecionado, campo, valor)
-            if 'sucesso' in resultado:
-                alterados += 1
-        
-        messagebox.showinfo("Salvo!", f"✅ {alterados} campos salvos com sucesso!\nIncluindo X-LAT e Y-LONG")
-        self.ler_metadados()
-    
-    def escrever_campo_exif(self, caminho_imagem, campo, valor):
-        """✅ Suporta X-LAT e Y-LONG como campos customizados"""
         try:
-            exif_dict = piexif.load(caminho_imagem)
+            exif_dict = piexif.load(self.arquivo_selecionado)
             
-            mapeamento_padrao = {
-                'ImageDescription': piexif.ImageIFD.ImageDescription,
-                'Make': piexif.ImageIFD.Make,
-                'Model': piexif.ImageIFD.Model,
-                'Software': piexif.ImageIFD.Software,
-                'Artist': piexif.ImageIFD.Artist,
-                'Copyright': piexif.ImageIFD.Copyright,
-                'DateTime': piexif.ImageIFD.DateTime
-            }
+            # Salva coordenadas no UserComment
+            comentario = f"X-LAT:{xlat};Y-LONG:{ylong};CNC-METADATA"
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = comentario.encode('utf-8')
             
-            # ✅ CAMPOS CUSTOMIZADOS X-LAT e Y-LONG (usa UserComment)
-            if campo == 'X-LAT':
-                # Armazena como comentário do usuário com prefixo
-                comentario_x = f"X-LAT:{valor}"
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = comentario_x.encode('utf-8')
-            elif campo == 'Y-LONG':
-                comentario_y = f"Y-LONG:{valor}"
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = comentario_y.encode('utf-8')
-            elif campo in mapeamento_padrao:
-                tag_id = mapeamento_padrao[campo]
-                if valor.strip():
-                    exif_dict['0th'][tag_id] = valor.encode('utf-8')
-                else:
-                    exif_dict['0th'].pop(tag_id, None)
-            else:
-                return {'erro': f'Campo {campo} não suportado'}
+            # Também na descrição
+            exif_dict['0th'][piexif.ImageIFD.ImageDescription] = f"CNC X:{xlat} Y:{ylong}".encode('utf-8')
             
             exif_bytes = piexif.dump(exif_dict)
-            piexif.insert(exif_bytes, caminho_imagem)
-            return {'sucesso': True}
+            piexif.insert(exif_bytes, self.arquivo_selecionado)
+            
+            messagebox.showinfo("✅ SALVO", f"X-LAT: {xlat}\nY-LONG: {ylong}")
+            self.analisar_tudo()
+            
         except Exception as e:
-            return {'erro': str(e)}
+            messagebox.showerror("ERRO", str(e))
+    
+    def copiar_coords(self):
+        coords = f"X-LAT:{self.entry_xlat.get()}, Y-LONG:{self.entry_ylong.get()}"
+        self.root.clipboard_clear()
+        self.root.clipboard_append(coords)
+        messagebox.showinfo("COPIADO", "Coordenadas copiadas!")
 
 if __name__ == "__main__":
+    from datetime import datetime
     root = tk.Tk()
-    app = EditorEXIF(root)
+    app = VisualizadorMetadadosLimpo(root)
     root.mainloop()
