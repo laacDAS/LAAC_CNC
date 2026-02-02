@@ -504,7 +504,7 @@ def gerar_pontos_adensados(self, step_x=100, step_y=100):
     ax.set_aspect('auto')
     ax.set_xlabel('X (mm)')
     ax.set_ylabel('Y (mm)')
-    ax.set_title(f'Visualização dos Pontos Adensados ({len(points)} pontos, passo {step}mm)')
+    ax.set_title(f'Visualização dos Pontos Adensados ({len(points)} pontos, passo X={step_x}mm Y={step_y}mm)')
     plt.tight_layout()
     plt.show()
     confirm = msg.askyesno("Confirmação de Grade", f"Grade de pontos gerada com passo X={step_x}mm e Y={step_y}mm.\n\nA visualização foi exibida.\n\nDeseja salvar pontos.json?")
