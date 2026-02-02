@@ -198,7 +198,20 @@ class VisualizadorMetadadosLimpo:
             
             # Procura X-LAT e Y-LONG no UserComment
             if 'Exif' in exif_dict and piexif.ExifIFD.UserComment in exif_dict['Exif']:
-                comentario = exif_dict['Exif'][piexif.ExifIFD.UserComment].decode('utf-8', errors='ignore')
+                raw_comment = exif_dict['Exif'][piexif.ExifIFD.UserComment]
+                comentario = ''
+                if isinstance(raw_comment, bytes):
+                    # Trata prefixo de codificação EXIF (8 bytes), se presente
+                    prefix = raw_comment[:8]
+                    if prefix.startswith(b'ASCII') or prefix.startswith(b'UNICODE') or prefix.startswith(b'JIS'):
+                        try:
+                            comentario = raw_comment[8:].decode('utf-8', errors='ignore')
+                        except:
+                            comentario = raw_comment[8:].decode('latin-1', errors='ignore')
+                    else:
+                        comentario = raw_comment.decode('utf-8', errors='ignore')
+                else:
+                    comentario = str(raw_comment)
                 
                 # Extrai coordenadas
                 x_match = re.search(r'X[-_]?LAT[:\s]*([-\d.]+)', comentario, re.IGNORECASE)
@@ -231,7 +244,8 @@ class VisualizadorMetadadosLimpo:
             
             # Salva coordenadas no UserComment
             comentario = f"X-LAT:{xlat};Y-LONG:{ylong};CNC-METADATA"
-            exif_dict['Exif'][piexif.ExifIFD.UserComment] = comentario.encode('utf-8')
+            # Escreve UserComment com prefixo de codificação ASCII (8 bytes)
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = b'ASCII\x00\x00\x00' + comentario.encode('utf-8')
             
             # Também na descrição
             exif_dict['0th'][piexif.ImageIFD.ImageDescription] = f"CNC X:{xlat} Y:{ylong}".encode('utf-8')

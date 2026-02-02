@@ -75,7 +75,7 @@ def multi_images_capture():
         percent = progress * 100
         print(f"Progresso: [{bar}] {percent:.1f}% ({current}/{total})")
 
-    dir_img = "output_image/"
+    dir_img = "output_unitarias/"
     if not os.path.exists(dir_img):
         os.makedirs(dir_img)
 
@@ -236,7 +236,7 @@ def start_process(self):
     # Cria pasta com data/hora
     
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    self.session_dir = os.path.join("output_images", now)
+    self.session_dir = os.path.join("output_unitarias", now)
     if not os.path.exists(self.session_dir):
         os.makedirs(self.session_dir)
     log(self, f"Imagens serão salvas em: {self.session_dir}")
@@ -340,7 +340,7 @@ def start_dense_process(self):
     log(self, "Iniciando Captura Adensada (alta sobreposição)...")
     # Cria pasta com data/hora
     now = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    self.session_dir = os.path.join("Fotos Adensadas", now)
+    self.session_dir = os.path.join("output_dense", now)
     if not os.path.exists(self.session_dir):
         os.makedirs(self.session_dir)
     log(self, f"Imagens adensadas serão salvas em: {self.session_dir}")
@@ -443,8 +443,10 @@ def run_dense_process(self):
             except Exception:
                 exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
             # Concatena ambos os campos no UserComment
-            user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
-            exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment.encode('utf-8')
+                user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
+                # Prepend EXIF UserComment encoding marker (ASCII) for compatibility
+                user_comment_bytes = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
+                exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment_bytes
             exif_bytes = piexif.dump(exif_dict)
             pil_img.save(nome, exif=exif_bytes)
             pil_img.close()
@@ -581,6 +583,7 @@ def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
     """
     # Formato customizado: X-LAT e Y-LONG no UserComment
     user_comment = f"X-LAT:{x};Y-LONG:{y}"
+    user_comment_bytes = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
     exif_dict = {
         "0th": {
             piexif.ImageIFD.ImageDescription: filename.encode(),
@@ -588,7 +591,7 @@ def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
             piexif.ImageIFD.YResolution: (dpi, 1),
         },
         "Exif": {
-            piexif.ExifIFD.UserComment: user_comment.encode('utf-8')
+            piexif.ExifIFD.UserComment: user_comment_bytes
         }
     }
     exif_bytes = piexif.dump(exif_dict)
@@ -613,7 +616,7 @@ def captura_adensada():
         cnc.home()
 
         # Pasta de destino
-        output_dir = Path("Fotos Adensadas")
+        output_dir = Path("output_dense")
         output_dir.mkdir(exist_ok=True)
 
         # Parâmetros de captura

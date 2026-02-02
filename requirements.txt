@@ -1,0 +1,9 @@
+pillow
+opencv-python
+pyserial
+numpy
+piexif
+matplotlib
+pandas
+exifread
+pyexiv2

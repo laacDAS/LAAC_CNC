@@ -124,18 +124,5 @@
             "X": -812.000,
             "Y": -150.000
         }
-    ],
-    
-    "python_dependencies": [
-        {"name": "pillow", "import": "PIL"},
-        {"name": "opencv-python", "import": "cv2"},
-        {"name": "pyserial", "import": "serial"},
-        {"name": "numpy", "import": "numpy"},
-        {"name": "piexif", "import": "piexif"},
-        {"name": "pandas", "import": "pandas"},
-        {"name": "matplotlib", "import": "matplotlib"},
-        {"name": "piexif ", "import": "piexif"},
-        {"name": "exifread", "import": "exifread"},
-        {"name": "pyexiv2", "import": "pyexiv2"}
     ]
 }

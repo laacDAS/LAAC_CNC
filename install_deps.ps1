@@ -57,44 +57,81 @@ if ($activate) {
     Write-Host "Venv ativada."
 }
 
-# Lê as dependências do cfg.json
-$cfg = Get-Content -Raw -Path "cfg.json" | ConvertFrom-Json
-$deps = $cfg.python_dependencies
-
-# Verifica e mostra status das dependências
-$table = @()
-foreach ($dep in $deps) {
-    $result = python -c "import $($dep.import)" 2>$null
-    if ($LASTEXITCODE -eq 0) {
-        $status = "INSTALADO"
-    } else {
-        $status = "NÃO INSTALADO"
-    }
-    $table += [PSCustomObject]@{
-        Pacote = $dep.name
-        Modulo = $dep.import
-        Status = $status
-    }
+# Lê dependências do requirements.txt e verifica/instala usando o Python selecionado
+if (!(Test-Path "requirements.txt")) {
+    Write-Host "Arquivo requirements.txt não encontrado na raiz do projeto. Crie-o e rode novamente."
+    exit 1
 }
 
-Write-Host "\nSTATUS DAS DEPENDÊNCIAS:"
+$raw = Get-Content -Path "requirements.txt" | ForEach-Object { $_.Trim() } | Where-Object { $_ -and -not ($_.StartsWith('#')) }
+$reqs = @()
+foreach ($line in $raw) {
+    # Remove comentários inline e espaços
+    $pkg = $line -split '\\s*#' | Select-Object -First 1
+    $pkg = $pkg.Trim()
+    if ($pkg) { $reqs += $pkg }
+}
+
+if ($reqs.Count -eq 0) {
+    Write-Host "Nenhuma dependência válida encontrada em requirements.txt"
+    exit 0
+}
+
+# Detecta venv e escolhe python a ser usado para instalação
+$venvPath = ".venv"
+$useVenv = $false
+$chosenPython = "python"
+if (Test-Path $venvPath) {
+    $resp = Read-Host "Existe a venv '.venv'. Deseja usar a venv para instalar as dependências? (s/n)"
+    if ($resp -eq 's' -or $resp -eq 'S') { $useVenv = $true }
+}
+
+if ($useVenv) {
+    # Procura executável python na venv (Windows/Unix)
+    $winPython = Join-Path $venvPath "Scripts\python.exe"
+    $unixPython = Join-Path $venvPath "bin/python"
+    if (Test-Path $winPython) { $chosenPython = $winPython }
+    elseif (Test-Path $unixPython) { $chosenPython = $unixPython }
+    else {
+        Write-Host "Executável Python não encontrado dentro de .venv. Usando 'python' do sistema."
+        $chosenPython = "python"
+    }
+    Write-Host "Usando Python: $chosenPython"
+} else {
+    Write-Host "Usando o Python do sistema (comando 'python')."
+}
+
+# Função para verificar se pacote está instalado (pip show)
+function Test-PackageInstalled($pkg) {
+    $proc = Start-Process -FilePath $chosenPython -ArgumentList "-m","pip","show","$pkg" -NoNewWindow -PassThru -Wait -ErrorAction SilentlyContinue
+    return ($proc.ExitCode -eq 0)
+}
+
+$table = @()
+foreach ($req in $reqs) {
+    # Extrai o nome do pacote sem especificadores de versão
+    $name = $req -split '[=<>~]' | Select-Object -First 1
+    $installed = Test-PackageInstalled $name
+    $status = if ($installed) { 'INSTALADO' } else { 'NÃO INSTALADO' }
+    $table += [PSCustomObject]@{ Pacote = $req; Nome = $name; Status = $status }
+}
+
+Write-Host "\nSTATUS DAS DEPENDÊNCIAS (baseado em requirements.txt):"
 $table | Format-Table -AutoSize | Out-String | Write-Host
 
-# Instala apenas os que não estão instalados
-$to_install = $table | Where-Object { $_.Status -eq "NÃO INSTALADO" } | ForEach-Object { $_.Pacote }
-if ($to_install.Count -gt 0) {
-    $resp = Read-Host "Deseja instalar as dependências faltantes? (s/n)"
+$toInstall = $table | Where-Object { $_.Status -eq 'NÃO INSTALADO' } | ForEach-Object { $_.Pacote }
+if ($toInstall.Count -gt 0) {
+    $resp = Read-Host "Deseja instalar as dependências não instaladas usando $chosenPython? (s/n)"
     if ($resp -eq 's' -or $resp -eq 'S') {
-        pip install $to_install
+        Write-Host "Instalando..."
+        & $chosenPython -m pip install --upgrade pip
+        & $chosenPython -m pip install -r requirements.txt
     } else {
-        Write-Host "Instalação de dependências cancelada pelo usuário."
+        Write-Host "Instalação cancelada pelo usuário."
     }
 } else {
     Write-Host "Todas as dependências já estão instaladas."
 }
-
-# Dependências opcionais/utilitários
-pip install --upgrade pip
 
 Write-Host "\nProcesso finalizado."
 
