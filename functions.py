@@ -462,17 +462,18 @@ def run_dense_process(self):
     wait_for_idle(self)
     finalize(self)
 
-def gerar_pontos_adensados(self, step=100):
+def gerar_pontos_adensados(self, step_x=100, step_y=100):
     """
     Gera pontos adensados em padrão zig-zag, salva em pontos.json e mostra popup para confirmação.
-    step: espaçamento entre pontos (mm)
+    step_x: espaçamento entre pontos no eixo X (mm)
+    step_y: espaçamento entre pontos no eixo Y (mm)
     """
     width = 900
     length = 2000
     points = []
     pid = 1
-    xs = list(range(0, width + 1, step))
-    ys = list(range(0, length + 1, step))
+    xs = list(range(0, width + 1, step_x))
+    ys = list(range(0, length + 1, step_y))
     for xi, x in enumerate(xs):
         linha = []
         y_iter = ys if xi % 2 == 0 else ys[::-1]
@@ -506,7 +507,7 @@ def gerar_pontos_adensados(self, step=100):
     ax.set_title(f'Visualização dos Pontos Adensados ({len(points)} pontos, passo {step}mm)')
     plt.tight_layout()
     plt.show()
-    confirm = msg.askyesno("Confirmação de Grade", f"Grade de pontos gerada com passo {step}mm.\n\nA visualização foi exibida.\n\nDeseja salvar pontos.json?")
+    confirm = msg.askyesno("Confirmação de Grade", f"Grade de pontos gerada com passo X={step_x}mm e Y={step_y}mm.\n\nA visualização foi exibida.\n\nDeseja salvar pontos.json?")
     if confirm:
         with open("pontos.json", "w") as f:
             json.dump(points, f, indent=4)
@@ -520,16 +521,24 @@ def criar_interface_gerar_pontos(self):
     from tkinter import ttk
     frame = tk.Frame(self.root)
     frame.pack(pady=10)
-    tk.Label(frame, text="Passo (mm):").pack(side=tk.LEFT)
-    passo_entry = tk.Entry(frame, width=5)
-    passo_entry.insert(0, "100")
-    passo_entry.pack(side=tk.LEFT)
+    tk.Label(frame, text="Passo X (mm):").pack(side=tk.LEFT)
+    passo_x_entry = tk.Entry(frame, width=5)
+    passo_x_entry.insert(0, "100")
+    passo_x_entry.pack(side=tk.LEFT)
+    tk.Label(frame, text="Passo Y (mm):").pack(side=tk.LEFT, padx=(8,0))
+    passo_y_entry = tk.Entry(frame, width=5)
+    passo_y_entry.insert(0, "100")
+    passo_y_entry.pack(side=tk.LEFT)
     def on_gerar():
         try:
-            step = int(passo_entry.get())
+            step_x = int(passo_x_entry.get())
         except Exception:
-            step = 100
-        gerar_pontos_adensados(self, step)
+            step_x = 100
+        try:
+            step_y = int(passo_y_entry.get())
+        except Exception:
+            step_y = 100
+        gerar_pontos_adensados(self, step_x=step_x, step_y=step_y)
     btn = ttk.Button(frame, text="Gerar Pontos Adensados", command=on_gerar)
     btn.pack(side=tk.LEFT)
 
