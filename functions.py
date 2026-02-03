@@ -340,16 +340,8 @@ def run_process(self, selected_indices):
     update_progress(self, 0, num_plants)
     send_grbl(self, '$X')
     wait_for_idle(self)
-    
-    # Executa homing apenas se não foi executado automaticamente na inicialização
-    if not self.homing_executed:
-        log(self, "Executando homing no início da inspeção...")
-        send_grbl(self, '$H')
-        wait_for_idle(self)
-        self.homing_executed = True
-    else:
-        log(self, "Homing já foi executado automaticamente. Pulando homing...")
-    
+    send_grbl(self, '$H')
+    wait_for_idle(self)
     send_grbl(self, '$')
     send_grbl(self, '?')
     send_grbl(self, 'G1 F14000')
@@ -583,7 +575,7 @@ def gerar_pontos_adensados(self, step_x=100, step_y=100):
         msg.showinfo("Cancelado", "Geração de pontos cancelada.")
 def criar_interface_gerar_pontos(self):
     """
-    Adiciona botão e entrada para gerar pontos adensados e botão de homing na interface principal.
+    Adiciona botão e entrada para gerar pontos adensados na interface principal.
     """
     from tkinter import ttk
     frame = tk.Frame(self.root)
@@ -607,11 +599,7 @@ def criar_interface_gerar_pontos(self):
             step_y = 100
         gerar_pontos_adensados(self, step_x=step_x, step_y=step_y)
     btn = ttk.Button(frame, text="Gerar Pontos Adensados", command=on_gerar)
-    btn.pack(side=tk.LEFT, padx=5)
-    
-    # Botão Executar Homing (Calibração) à direita do "Gerar Pontos Adensados"
-    homing_btn = ttk.Button(frame, text="Executar Homing (calibração)", command=lambda: execute_homing_manual(self))
-    homing_btn.pack(side=tk.LEFT, padx=5)
+    btn.pack(side=tk.LEFT)
 
 # --- Classes utilitárias (de camera.py e cnc_controller.py) ---
 class Camera:
@@ -806,109 +794,3 @@ def captura_adensada():
         logging.info("[Captura Adensada] Finalizada com sucesso.")
     except Exception as e:
         logging.error(f"Erro na captura adensada: {e}")
-
-def execute_homing_automatic(self):
-    """
-    Executa homing automaticamente na inicialização do programa.
-    Esta função é chamada apenas uma vez, via root.after().
-    """
-    log(self, "===============================================================")
-    log(self, "Executando Homing (Calibração) automático na inicialização...")
-    log(self, "===============================================================")
-    
-    def run_homing():
-        self.grbl = None
-        with open("cfg.json", "r") as file:
-            data = json.load(file)
-        
-        PORT = data["port"]
-        BAUDRATE = data["baudrate"]
-        
-        try:
-            log(self, "Conectando ao GRBL para homing automático...")
-            self.grbl = serial.Serial(PORT, BAUDRATE, timeout=1)
-            time.sleep(2)
-            self.grbl.write(b"\r\n\r\n")
-            time.sleep(2)
-            self.grbl.flushInput()
-            log(self, "Conectado ao GRBL na porta: " + PORT)
-            
-            # Executar homing
-            log(self, "Desbloqueando eixos...")
-            send_grbl(self, '$X')
-            wait_for_idle(self)
-            
-            log(self, "Executando homing...")
-            send_grbl(self, '$H')
-            wait_for_idle(self)
-            
-            log(self, "Homing automático concluído com sucesso!")
-            log(self, "===============================================================")
-            self.homing_executed = True
-            
-        except Exception as e:
-            log(self, f"Erro ao executar homing automático: {e}")
-            log(self, "===============================================================")
-        finally:
-            if self.grbl:
-                self.grbl.close()
-                self.grbl = None
-    
-    # Executar em uma thread separada para não bloquear a interface
-    thread = threading.Thread(target=run_homing, daemon=True)
-    thread.start()
-
-def execute_homing_manual(self):
-    """
-    Executa homing manualmente quando o usuário clica no botão.
-    Funciona durante a inicialização e em qualquer momento posterior.
-    """
-    if self.running:
-        log(self, "Não é possível executar homing enquanto uma inspeção está em andamento.")
-        return
-    
-    log(self, "===============================================================")
-    log(self, "Executando Homing (Calibração) manual...")
-    log(self, "===============================================================")
-    
-    def run_homing():
-        self.grbl = None
-        with open("cfg.json", "r") as file:
-            data = json.load(file)
-        
-        PORT = data["port"]
-        BAUDRATE = data["baudrate"]
-        
-        try:
-            log(self, "Conectando ao GRBL para homing...")
-            self.grbl = serial.Serial(PORT, BAUDRATE, timeout=1)
-            time.sleep(2)
-            self.grbl.write(b"\r\n\r\n")
-            time.sleep(2)
-            self.grbl.flushInput()
-            log(self, "Conectado ao GRBL na porta: " + PORT)
-            
-            # Executar homing
-            log(self, "Desbloqueando eixos...")
-            send_grbl(self, '$X')
-            wait_for_idle(self)
-            
-            log(self, "Executando homing...")
-            send_grbl(self, '$H')
-            wait_for_idle(self)
-            
-            log(self, "Homing manual concluído com sucesso!")
-            log(self, "===============================================================")
-            self.homing_executed = True
-            
-        except Exception as e:
-            log(self, f"Erro ao executar homing manual: {e}")
-            log(self, "===============================================================")
-        finally:
-            if self.grbl:
-                self.grbl.close()
-                self.grbl = None
-    
-    # Executar em uma thread separada para não bloquear a interface
-    thread = threading.Thread(target=run_homing, daemon=True)
-    thread.start()

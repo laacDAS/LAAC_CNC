@@ -8,8 +8,7 @@ import json
 from functions import (
     log, update_status, update_progress, update_image,
     signal_handler, cancel, finalize, send_grbl, wait_for_idle,
-    get_image, start_process, run_process, criar_interface_gerar_pontos,
-    execute_homing_automatic
+    get_image, start_process, run_process, criar_interface_gerar_pontos
 )
 
 
@@ -122,14 +121,10 @@ class App:
         self.cam = None
         self.running = False
         self.thread = None
-        self.homing_executed = False  # Rastreia se homing foi executado automaticamente
 
         # Registra o manipulador de sinal na thread principal
         signal.signal(signal.SIGINT, lambda sig,
                       frame: signal_handler(self, sig, frame))
-        
-        # Executa homing automático na inicialização (via root.after para evitar bloqueio)
-        self.root.after(500, lambda: execute_homing_automatic(self))
 
     def update_plants_list(self, event=None):
         room_key = self.room_var.get()
