@@ -484,10 +484,10 @@ def run_dense_process(self):
             except Exception:
                 exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
             # Concatena ambos os campos no UserComment
-                user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
-                # Prepend EXIF UserComment encoding marker (ASCII) for compatibility
-                user_comment_bytes = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
-                exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment_bytes
+            user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
+            # Prepend EXIF UserComment encoding marker (ASCII) for compatibility
+            user_comment_bytes = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = user_comment_bytes
             exif_bytes = piexif.dump(exif_dict)
             pil_img.save(nome, exif=exif_bytes)
             pil_img.close()
