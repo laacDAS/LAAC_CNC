@@ -1,4 +1,3 @@
-
 import cv2 as cv
 import serial
 import time
@@ -13,6 +12,8 @@ import tkinter as tk
 import tkinter.messagebox as msg
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import subprocess
+import shutil
 
 def multi_images_capture():
     """
@@ -60,24 +61,18 @@ def multi_images_capture():
         ret, frame = cam.read()
         if not ret:
             print(f"Erro ao capturar imagem {image_number:03d}")
-            return
+            return None
         frame_resized = cv.resize(frame, (640, 360))
         if os.environ.get("DISPLAY"):
             cv.imshow('Imagem', frame_resized)
             cv.waitKey(30)
+        # monta nome com timestamp e sequência
         timestamp = datetime.datetime.now().strftime("%H%M%S")
-        nome = dir_img + f"capture-{timestamp}-{image_number:04d}.jpg"  # Nome com timestamp e sequência
+        nome = dir_img + f"capture-{timestamp}-{image_number:04d}.jpg"
         cv.imwrite(nome, frame)
         return nome
-
-    def print_progress(current, total, width=50):
-        progress = current / total
-        filled = int(width * progress)
-        bar = '#' * filled + '-' * (width - filled)
-        percent = progress * 100
-        print(f"Progresso: [{bar}] {percent:.1f}% ({current}/{total})")
-
-    dir_img = "output_unitarias/"
+    # pasta de saída padrão para captura múltipla (compatível com demais nomes do projeto)
+    dir_img = "output_unitarias"
     if not os.path.exists(dir_img):
         os.makedirs(dir_img)
 
@@ -247,8 +242,8 @@ def get_image(self, plant_idx):
             exif_dict = piexif.load(nome)
         except Exception:
             exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
-        user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
-        exif_dict['Exif'][piexif.ExifIFD.UserComment] = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
+            user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
+            exif_dict['Exif'][piexif.ExifIFD.UserComment] = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
         exif_bytes = piexif.dump(exif_dict)
         pil_img.save(nome, exif=exif_bytes)
         pil_img.close()
@@ -709,6 +704,7 @@ def _embed_xmp_tags(jpeg_path, x, y):
             f.write(new_data)
     except Exception:
         return
+    return False
 
 def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
     """
