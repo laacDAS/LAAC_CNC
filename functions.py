@@ -15,6 +15,28 @@ import matplotlib.patches as patches
 import subprocess
 import shutil
 
+def configure_camera(cam):
+    """
+    Configura os parâmetros da câmera para captura padronizada.
+    
+    Parâmetros:
+    - cam: objeto cv.VideoCapture
+    """
+    # Resolução 1080p
+    cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+    cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+    
+    # Desligar auto exposure (valor pode variar!)
+    cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 0.25)  # manual
+    cam.set(cv.CAP_PROP_EXPOSURE, -6)         # ajuste empírico
+    
+    # Desligar auto white balance
+    cam.set(cv.CAP_PROP_AUTO_WB, 0)           # manual
+    cam.set(cv.CAP_PROP_WB_TEMPERATURE, 4500) # temperatura em Kelvin
+    
+    # Desligar auto focus
+    cam.set(cv.CAP_PROP_AUTOFOCUS, 0)         # manual
+
 def multi_images_capture():
     """
     Rotina de captura múltipla baseada em multi_images_capture.py
@@ -107,8 +129,7 @@ def multi_images_capture():
         print("-> Erro ao abrir a câmera. Verifique a conexão...")
         grbl.close()
         exit()
-    cam.set(3, 1920)
-    cam.set(4, 1080)
+    configure_camera(cam)
 
     print(f"Processando 12 plantas, 10 vezes cada (120 capturas)...")
     print_progress(0, 120)
@@ -312,10 +333,7 @@ def run_process(self, selected_indices):
         return
     else:
         log(self, "-> Camera iniciada com sucesso...")
-    #define o tamanho da imagem
-    self.cam.set(3, 1920)
-    self.cam.set(4, 1080)
-    
+    configure_camera(self.cam)
     
     num_plants = len(selected_indices)
     log(self, f"Processando {num_plants} plantas...")
@@ -416,9 +434,7 @@ def run_dense_process(self):
         return
     else:
         log(self, "-> Camera iniciada com sucesso...")
-    self.cam.set(3, 1920)
-    self.cam.set(4, 1080)
-
+    configure_camera(self.cam)
 
     # Lê coordenadas do pontos.json
     try:
