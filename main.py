@@ -98,6 +98,14 @@ class App:
             command=lambda: start_dense_process(self)
         )
         self.captura_adensada_button.pack(side=tk.LEFT, padx=5)
+        # Checkbox para rotacionar 180 graus a captura da webcam
+        self.rotate_180_var = tk.BooleanVar(value=False)
+        self.rotate_180_chk = ttk.Checkbutton(
+            self.button_frame,
+            text="Rotacionar 180°",
+            variable=self.rotate_180_var
+        )
+        self.rotate_180_chk.pack(side=tk.LEFT, padx=5)
 
         # Frame para visualização da imagem (direita)
         self.image_frame = ttk.Frame(self.main_frame)

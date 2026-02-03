@@ -1,9 +1,12 @@
-pillow
+Pillow
 opencv-python
 pyserial
 numpy
 piexif
 matplotlib
-pandas
 exifread
 pyexiv2
+
+# Notes:
+# - `pyexiv2` may require system library libexiv2 (install via apt/yum/homebrew).
+# - If you run headless (no GUI), consider replacing `opencv-python` with `opencv-python-headless`.

@@ -121,11 +121,93 @@ $table | Format-Table -AutoSize | Out-String | Write-Host
 
 $toInstall = $table | Where-Object { $_.Status -eq 'NÃO INSTALADO' } | ForEach-Object { $_.Pacote }
 if ($toInstall.Count -gt 0) {
+    # Antes de instalar pacotes Python, tenta garantir que libexiv2/exiv2 esteja presente
+    $exivCmd = Get-Command exiv2 -ErrorAction SilentlyContinue
+    if (-not $exivCmd) {
+        Write-Host "libexiv2/exiv2 não encontrado. Tentando instalar via gerenciador do sistema..."
+        try {
+            if ($IsWindows) {
+                $choco = Get-Command choco -ErrorAction SilentlyContinue
+                if ($choco) {
+                    Write-Host "Usando Chocolatey para instalar exiv2..."
+                    & choco install exiv2 -y
+                } else {
+                    $winget = Get-Command winget -ErrorAction SilentlyContinue
+                    if ($winget) {
+                        Write-Host "Usando winget para instalar exiv2..."
+                        & winget install --id Exiv2.Exiv2 -e --accept-package-agreements --accept-source-agreements
+                    } else {
+                        Write-Host "Chocolatey/winget não encontrado. Instalação automática no Windows não é possível neste sistema."
+                        Write-Host "Sugestão: instale Chocolatey (https://chocolatey.org/install) e rode: choco install exiv2 -y"
+                        Write-Host "Ou baixe/instale exiv2 manualmente: https://www.exiv2.org/"
+                    }
+                }
+            } elseif ($IsMacOS) {
+                $brew = Get-Command brew -ErrorAction SilentlyContinue
+                if ($brew) {
+                    Write-Host "Usando Homebrew para instalar exiv2..."
+                    & brew install exiv2
+                } else {
+                    Write-Host "Homebrew não encontrado. Instale Homebrew (https://brew.sh/) e rode: brew install exiv2"
+                }
+            } elseif ($IsLinux) {
+                $osRelease = ""
+                if (Test-Path "/etc/os-release") { $osRelease = Get-Content /etc/os-release -Raw }
+                if ($osRelease -match "(ubuntu|debian)") {
+                    Write-Host "Usando apt para instalar libexiv2-dev..."
+                    & sudo apt-get update
+                    & sudo apt-get install -y libexiv2-dev || & sudo apt-get install -y exiv2
+                } elseif ($osRelease -match "(fedora|rhel|centos)") {
+                    Write-Host "Usando dnf para instalar libexiv2-devel..."
+                    & sudo dnf install -y libexiv2-devel || & sudo dnf install -y exiv2
+                } else {
+                    # Tenta apt e dnf como fallback
+                    Write-Host "Distro não reconhecida. Tentando apt e dnf como fallback..."
+                    try { & sudo apt-get update; & sudo apt-get install -y libexiv2-dev } catch { Write-Host "apt falhou" }
+                    try { & sudo dnf install -y libexiv2-devel } catch { Write-Host "dnf falhou" }
+                }
+            } else {
+                Write-Host "Sistema operacional não reconhecido. Instale libexiv2/exiv2 manualmente (https://www.exiv2.org/)."
+            }
+        } catch {
+            Write-Host "Falha ao tentar instalar libexiv2 automaticamente: $($_.Exception.Message)"
+        }
+        # Re-check
+        $exivCmd = Get-Command exiv2 -ErrorAction SilentlyContinue
+        if ($exivCmd) { 
+            Write-Host "libexiv2/exiv2 instalado ou já disponível." 
+        } else { 
+            Write-Host "Não foi possível instalar libexiv2 automaticamente. Por favor instale manualmente."
+            if ($IsWindows) {
+                Write-Host "Exemplo de ação manual (Windows): instale Chocolatey e rode: choco install exiv2 -y"
+                Write-Host "Chocolatey: https://chocolatey.org/install"
+            } elseif ($IsMacOS) {
+                Write-Host "Exemplo de ação manual (macOS): brew install exiv2"
+            } elseif ($IsLinux) {
+                Write-Host "Exemplo de ação manual (Ubuntu/Debian): sudo apt-get update && sudo apt-get install -y libexiv2-dev"
+                Write-Host "Exemplo de ação manual (Fedora): sudo dnf install -y libexiv2-devel"
+            } else {
+                Write-Host "Consulte https://www.exiv2.org/ para instruções específicas do seu sistema."
+            }
+        }
+    }
+
     $resp = Read-Host "Deseja instalar as dependências não instaladas usando $chosenPython? (s/n)"
     if ($resp -eq 's' -or $resp -eq 'S') {
         Write-Host "Instalando..."
         & $chosenPython -m pip install --upgrade pip
         & $chosenPython -m pip install -r requirements.txt
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERRO: 'pip install' retornou código de saída $LASTEXITCODE."
+            Write-Host "Sugestões:"
+            Write-Host " - Verifique sua conexão de rede e tente novamente: $chosenPython -m pip install -r requirements.txt"
+            Write-Host " - Se estiver usando .venv, verifique se a venv está ativada antes de executar o script."
+            Write-Host " - Verifique permissões (use --user ou rode em ambiente com privilégios adequados)."
+            Write-Host " - Se o erro for relacionado ao 'pyexiv2', instale primeiro a dependência do sistema 'libexiv2' (veja instruções acima)."
+            Write-Host "Depois de corrigir, execute novamente: $chosenPython -m pip install -r requirements.txt"
+        } else {
+            Write-Host "Pip instalou as dependências com sucesso."
+        }
     } else {
         Write-Host "Instalação cancelada pelo usuário."
     }

@@ -65,8 +65,10 @@ def multi_images_capture():
         if os.environ.get("DISPLAY"):
             cv.imshow('Imagem', frame_resized)
             cv.waitKey(30)
-        nome = dir_img + f"{image_number:03d}.jpg"  # Nome de 001 a 120
+        timestamp = datetime.datetime.now().strftime("%H%M%S")
+        nome = dir_img + f"capture-{timestamp}-{image_number:04d}.jpg"  # Nome com timestamp e sequência
         cv.imwrite(nome, frame)
+        return nome
 
     def print_progress(current, total, width=50):
         progress = current / total
@@ -132,8 +134,8 @@ def multi_images_capture():
             print(f'Repetição {repetition + 1}/10 - Planta {plant + 1}/12 - Deslocando para {ID_PLANT[plant]}')
             send_grbl('G1 X' + str(POS_X_PLANT[plant]) + ' Y' + str(POS_Y_PLANT[plant]))
             wait_for_idle()
-            GetImage(image_counter)
-            print(f"Imagem capturada: {image_counter:03d}.jpg para {ID_PLANT[plant]}")
+            fname = GetImage(image_counter)
+            print(f"Imagem capturada: {fname} para {ID_PLANT[plant]}")
             print_progress(image_counter, total_images)
             image_counter += 1
 
@@ -220,9 +222,42 @@ def get_image(self, plant_idx):
     if not ret:
         log(self, f"Erro ao capturar imagem para {self.ID_PLANT[plant_idx]}")
         return
-    update_image(self, frame, self.ID_PLANT[plant_idx])
-    nome = os.path.join(self.session_dir, f"{self.ID_PLANT[plant_idx]}.jpg")
+    # Aplica rotação de 180 graus se checkbox estiver ativo na interface
+    try:
+        if hasattr(self, 'rotate_180_var') and self.rotate_180_var.get():
+            frame = cv.rotate(frame, cv.ROTATE_180)
+    except Exception:
+        pass
+    # Sequência por execução
+    if not hasattr(self, 'image_sequence') or self.image_sequence is None:
+        self.image_sequence = 0
+    self.image_sequence += 1
+    timestamp = datetime.datetime.now().strftime("%H%M%S")
+    nome = os.path.join(self.session_dir, f"unitaria-{timestamp}-{self.image_sequence:04d}-{self.ID_PLANT[plant_idx]}.jpg")
+    # Aplica rotação se necessário (já aplicado acima in-place), salva e injeta metadata XMP/EXIF
     cv.imwrite(nome, frame)
+    # Coordenadas da planta (para metadata)
+    x = float(self.POS_X_PLANT[plant_idx]) if hasattr(self, 'POS_X_PLANT') else 0.0
+    y = float(self.POS_Y_PLANT[plant_idx]) if hasattr(self, 'POS_Y_PLANT') else 0.0
+    # Tenta gravar EXIF UserComment com X-LAT/Y-LONG e também XMP position tags
+    try:
+        import piexif
+        pil_img = Image.open(nome)
+        try:
+            exif_dict = piexif.load(nome)
+        except Exception:
+            exif_dict = {"0th":{}, "Exif":{}, "GPS":{}, "1st":{}, "thumbnail":None}
+        user_comment = f"X-LAT:{x:.2f};Y-LONG:{y:.2f}"
+        exif_dict['Exif'][piexif.ExifIFD.UserComment] = b'ASCII\x00\x00\x00' + user_comment.encode('utf-8')
+        exif_bytes = piexif.dump(exif_dict)
+        pil_img.save(nome, exif=exif_bytes)
+        pil_img.close()
+    except Exception:
+        pass
+    try:
+        _embed_xmp_tags(nome, x, y)
+    except Exception:
+        pass
     log(self, f"Imagem capturada para {self.ID_PLANT[plant_idx]} em {nome}")
 
 def start_process(self):
@@ -430,8 +465,19 @@ def run_dense_process(self):
         if not ret:
             log(self, f"Erro ao capturar imagem adensada {img_count+1}")
             continue
-        nome = os.path.join(self.session_dir, f"adensada_{img_count+1:04d}_X{x:.2f}_Y{y:.2f}.jpg")
+        # Rotaciona a imagem se solicitado pela interface
+        try:
+            if hasattr(self, 'rotate_180_var') and self.rotate_180_var.get():
+                frame = cv.rotate(frame, cv.ROTATE_180)
+        except Exception:
+            pass
+        timestamp = datetime.datetime.now().strftime("%H%M%S")
+        nome = os.path.join(self.session_dir, f"adensada-{timestamp}-{img_count+1:04d}.jpg")
         cv.imwrite(nome, frame)
+        try:
+            _embed_xmp_tags(nome, x, y)
+        except Exception:
+            pass
         # Salva coordenadas X-LAT e Y-LONG no EXIF imediatamente após a captura
         try:
             import piexif
@@ -476,7 +522,9 @@ def gerar_pontos_adensados(self, step_x=100, step_y=100):
     ys = list(range(0, length + 1, step_y))
     for xi, x in enumerate(xs):
         linha = []
-        y_iter = ys if xi % 2 == 0 else ys[::-1]
+        # Inverte o início em Y para começar pelo lado maior (length)
+        # Alterna a direção a cada coluna para criar o padrão zigue-zague
+        y_iter = ys[::-1] if xi % 2 == 0 else ys
         for y in y_iter:
             linha.append({
                 "id": pid,
@@ -586,6 +634,82 @@ import logging
 import piexif
 from pathlib import Path
 
+def _embed_xmp_tags(jpeg_path, x, y):
+    """
+    Tenta adicionar tags XMP customizadas 'position-x' e 'position-y'.
+    Primeiro tenta usar pyexiv2; se não disponível, injeta manualmente um bloco APP1 XMP.
+    """
+    try:
+        import pyexiv2
+        # Prefer ImageMetadata API if available
+        try:
+            meta = pyexiv2.ImageMetadata(jpeg_path)
+            meta.read()
+            # Try to write XMP fields directly
+            try:
+                meta['Xmp.laac.position-x'] = str(x)
+                meta['Xmp.laac.position-y'] = str(y)
+                meta.write()
+                return
+            except Exception:
+                # Some pyexiv2 builds accept direct assignment differently; try lower-level XMP tag
+                try:
+                    from pyexiv2.xmp import XmpTag
+                    meta['Xmp.laac.position-x'] = XmpTag('Xmp.laac.position-x', str(x))
+                    meta['Xmp.laac.position-y'] = XmpTag('Xmp.laac.position-y', str(y))
+                    meta.write()
+                    return
+                except Exception:
+                    pass
+        except Exception:
+            # Older pyexiv2 API fallback
+            try:
+                img = pyexiv2.Image(jpeg_path)
+                xmp_keys = {
+                    'Xmp.laac.position-x': str(x),
+                    'Xmp.laac.position-y': str(y)
+                }
+                img.modify_xmp(xmp_keys)
+                img.close()
+                return
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    try:
+        # Monta pacote XMP mínimo (RDF) com namespace laac
+        xmp_xml = (
+            '<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+            '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+            '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+            '<rdf:Description xmlns:laac="http://ns.laac.ufv/1.0/" '
+            'laac:position-x="{xval}" laac:position-y="{yval}" />'
+            '</rdf:RDF></x:xmpmeta><?xpacket end="w"?>'
+        ).format(xval=str(x), yval=str(y))
+
+        xmp_header = b"http://ns.adobe.com/xap/1.0/\x00"
+        xmp_bytes = xmp_xml.encode('utf-8')
+        app1_payload = xmp_header + xmp_bytes
+        # Comprimento do segmento APP1 = payload + 2 bytes do tamanho
+        seg_len = len(app1_payload) + 2
+        if seg_len > 0xFFFF:
+            return
+
+        marker = b'\xff\xe1' + seg_len.to_bytes(2, byteorder='big') + app1_payload
+
+        # Lê arquivo JPEG e injeta após o SOI (0xFFD8)
+        with open(jpeg_path, 'rb') as f:
+            data = f.read()
+        if data[0:2] != b'\xff\xd8':
+            return
+        # Evita duplicar blocos XMP: se já existir header XMP, substitui (simplesmente insere)
+        new_data = data[0:2] + marker + data[2:]
+        with open(jpeg_path, 'wb') as f:
+            f.write(new_data)
+    except Exception:
+        return
+
 def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
     """
     Salva a imagem com metadados EXIF personalizados.
@@ -605,6 +729,11 @@ def salvar_imagem_com_exif(img, filepath, filename, dpi, x, y):
     }
     exif_bytes = piexif.dump(exif_dict)
     img.save(filepath, "jpeg", exif=exif_bytes)
+    # Also embed XMP tags position-x / position-y for tools like exiftool to show separate fields
+    try:
+        _embed_xmp_tags(str(filepath), x, y)
+    except Exception:
+        pass
 
 def captura_adensada():
     """
@@ -640,9 +769,10 @@ def captura_adensada():
             cnc.mover_para(x, y)
             # Capturar imagem
             img = camera.capturar_imagem()
-            filename = f"imagem_{i+1:03d}.jpg"
+            timestamp = datetime.datetime.now().strftime("%H%M%S")
+            filename = f"adensada-{timestamp}-{i+1:04d}.jpg"
             filepath = output_dir / filename
-            # Salvar imagem com EXIF
+            # Salvar imagem com EXIF and embed XMP
             salvar_imagem_com_exif(img, filepath, filename, dpi, x, y)
             logging.info(f"Imagem salva: {filepath} (X={x}, Y={y})")
             # Próxima posição
