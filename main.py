@@ -102,7 +102,7 @@ class App:
         self.rotate_180_var = tk.BooleanVar(value=False)
         self.rotate_180_chk = ttk.Checkbutton(
             self.button_frame,
-            text="Rotacionar 180°",
+            text="Rotacionar Imagem 180°",
             variable=self.rotate_180_var
         )
         self.rotate_180_chk.pack(side=tk.LEFT, padx=5)
