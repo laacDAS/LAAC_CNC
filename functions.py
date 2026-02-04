@@ -745,58 +745,67 @@ def abrir_calibracao_camera(self):
     # Variáveis para armazenar foto
     current_image = {"pil": None, "tk": None}
     
-    def apply_camera_settings():
+    def apply_camera_settings(cam):
         """Aplica as configurações atuais da câmera"""
         try:
-            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
-            if cam.isOpened():
-                cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-                cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-                
-                # Aplicar auto flags
-                cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 1.0 if auto_flags["auto_exposure"].get() else 0.25)
-                cam.set(cv.CAP_PROP_AUTO_WB, 1 if auto_flags["auto_wb"].get() else 0)
-                cam.set(cv.CAP_PROP_AUTOFOCUS, 1 if auto_flags["auto_focus"].get() else 0)
-                
-                # Aplicar sliders
-                cam.set(cv.CAP_PROP_EXPOSURE, int(slider_values["exposure"].get()))
-                cam.set(cv.CAP_PROP_WB_TEMPERATURE, int(slider_values["wb_temperature"].get()))
-                cam.set(cv.CAP_PROP_FOCUS, int(slider_values["focus"].get()))
-                cam.set(cv.CAP_PROP_BRIGHTNESS, int(slider_values["brightness"].get()))
-                cam.set(cv.CAP_PROP_CONTRAST, int(slider_values["contrast"].get()))
-                cam.set(cv.CAP_PROP_SATURATION, int(slider_values["saturation"].get()))
-                cam.set(cv.CAP_PROP_GAIN, int(slider_values["gain"].get()))
-                
-                return cam
+            # Aplicar auto flags
+            cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 1.0 if auto_flags["auto_exposure"].get() else 0.25)
+            cam.set(cv.CAP_PROP_AUTO_WB, 1 if auto_flags["auto_wb"].get() else 0)
+            cam.set(cv.CAP_PROP_AUTOFOCUS, 1 if auto_flags["auto_focus"].get() else 0)
+            
+            # Aplicar sliders
+            cam.set(cv.CAP_PROP_EXPOSURE, int(slider_values["exposure"].get()))
+            cam.set(cv.CAP_PROP_WB_TEMPERATURE, int(slider_values["wb_temperature"].get()))
+            cam.set(cv.CAP_PROP_FOCUS, int(slider_values["focus"].get()))
+            cam.set(cv.CAP_PROP_BRIGHTNESS, int(slider_values["brightness"].get()))
+            cam.set(cv.CAP_PROP_CONTRAST, int(slider_values["contrast"].get()))
+            cam.set(cv.CAP_PROP_SATURATION, int(slider_values["saturation"].get()))
+            cam.set(cv.CAP_PROP_GAIN, int(slider_values["gain"].get()))
         except Exception as e:
             print(f"Erro ao aplicar configurações: {e}")
-        return None
     
     def update_preview():
         """Atualiza a preview da câmera em tempo real"""
-        cam = apply_camera_settings()
-        if not cam:
-            return
-        
         try:
+            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+            if not cam.isOpened():
+                print("Erro ao abrir câmera")
+                return
+            
+            # Configuração inicial
+            cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+            cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+            time.sleep(0.3)
+            
+            frame_count = 0
             while not stop_preview["flag"]:
+                # Reaplicar configurações a cada frame para que sliders façam efeito
+                apply_camera_settings(cam)
+                
                 ret, frame = cam.read()
                 if ret:
                     # Redimensionar para caber no canvas
                     frame = cv.resize(frame, (480, 360))
                     frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
                     
+                    # Criar imagem PIL
                     pil_image = Image.fromarray(frame)
-                    current_image["pil"] = pil_image
                     current_image["tk"] = ImageTk.PhotoImage(pil_image)
                     
-                    canvas.create_image(0, 0, image=current_image["tk"], anchor=tk.NW)
+                    # Limpar canvas e desenhar nova imagem
+                    canvas.delete("all")
+                    canvas.create_image(240, 180, image=current_image["tk"])
+                    
+                    frame_count += 1
                 
-                time.sleep(0.1)
+                time.sleep(0.05)  # ~20 FPS
         except Exception as e:
             print(f"Erro na atualização da preview: {e}")
         finally:
-            cam.release()
+            try:
+                cam.release()
+            except:
+                pass
     
     def start_preview():
         """Inicia a thread de preview"""
