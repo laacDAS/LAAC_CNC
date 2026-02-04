@@ -633,11 +633,10 @@ def criar_interface_gerar_pontos(self):
 def abrir_calibracao_camera(self):
     """
     Abre janela de calibração de câmera com sliders para todos os parâmetros.
+    Utiliza botão de pré-visualização para carregar frame único com as configurações.
     """
     from tkinter import ttk, Scale
     from PIL import Image, ImageTk
-    import threading
-    import time
     
     # Carrega configurações atuais
     try:
@@ -691,10 +690,6 @@ def abrir_calibracao_camera(self):
         ("gain", "Gain", 0, 100, 50),
     ]
     
-    # Lista para rastrear threads de atualização
-    update_threads = {"preview": None}
-    stop_preview = {"flag": False}
-    
     for param_key, label, min_val, max_val, default_val in params:
         param_frame = ttk.Frame(left_frame)
         param_frame.pack(fill=tk.X, pady=5)
@@ -719,15 +714,15 @@ def abrir_calibracao_camera(self):
     
     # Parâmetros com botão Auto
     auto_params = [
-        ("auto_exposure", "Auto Exposure", "exposure"),
-        ("auto_wb", "Auto White Balance", "wb_temperature"),
-        ("auto_focus", "Auto Focus", "focus"),
+        ("auto_exposure", "Auto Exposure"),
+        ("auto_wb", "Auto White Balance"),
+        ("auto_focus", "Auto Focus"),
     ]
     
     auto_frame = ttk.LabelFrame(left_frame, text="Modo Automático", padding=10)
     auto_frame.pack(fill=tk.X, pady=10)
     
-    for auto_key, label, linked_param in auto_params:
+    for auto_key, label in auto_params:
         checkbox_var = tk.BooleanVar(value=camera_settings.get(auto_key, False))
         auto_flags[auto_key] = checkbox_var
         checkbox = ttk.Checkbutton(auto_frame, text=label, variable=checkbox_var)
@@ -739,21 +734,35 @@ def abrir_calibracao_camera(self):
     
     ttk.Label(right_frame, text="Preview da Câmera", font=("Arial", 12, "bold")).pack()
     
-    canvas = tk.Canvas(right_frame, width=480, height=360, bg="black")
+    canvas = tk.Canvas(right_frame, width=480, height=360, bg="gray20")
     canvas.pack(fill=tk.BOTH, expand=True, pady=10)
     
-    # Variáveis para armazenar foto
-    current_image = {"pil": None, "tk": None}
+    # Variável para armazenar a foto
+    current_image = {"tk": None}
     
-    def apply_camera_settings(cam):
-        """Aplica as configurações atuais da câmera"""
+    def capture_preview():
+        """Captura um frame com as configurações atuais dos sliders"""
         try:
-            # Aplicar auto flags
+            msg_label.config(text="Abrindo câmera...", foreground="blue")
+            calibration_window.update()
+            
+            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+            if not cam.isOpened():
+                msg_label.config(text="Erro: Câmera não disponível", foreground="red")
+                return
+            
+            # Configuração inicial
+            cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+            cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+            
+            # Aplicar configurações dos sliders
+            msg_label.config(text="Aplicando configurações...", foreground="blue")
+            calibration_window.update()
+            
             cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 1.0 if auto_flags["auto_exposure"].get() else 0.25)
             cam.set(cv.CAP_PROP_AUTO_WB, 1 if auto_flags["auto_wb"].get() else 0)
             cam.set(cv.CAP_PROP_AUTOFOCUS, 1 if auto_flags["auto_focus"].get() else 0)
             
-            # Aplicar sliders
             cam.set(cv.CAP_PROP_EXPOSURE, int(slider_values["exposure"].get()))
             cam.set(cv.CAP_PROP_WB_TEMPERATURE, int(slider_values["wb_temperature"].get()))
             cam.set(cv.CAP_PROP_FOCUS, int(slider_values["focus"].get()))
@@ -761,64 +770,39 @@ def abrir_calibracao_camera(self):
             cam.set(cv.CAP_PROP_CONTRAST, int(slider_values["contrast"].get()))
             cam.set(cv.CAP_PROP_SATURATION, int(slider_values["saturation"].get()))
             cam.set(cv.CAP_PROP_GAIN, int(slider_values["gain"].get()))
-        except Exception as e:
-            print(f"Erro ao aplicar configurações: {e}")
-    
-    def update_preview():
-        """Atualiza a preview da câmera em tempo real"""
-        try:
-            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
-            if not cam.isOpened():
-                print("Erro ao abrir câmera")
-                return
             
-            # Configuração inicial
-            cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
-            cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
-            time.sleep(0.3)
+            # Descartar alguns frames para permitir que a câmera se adapte
+            msg_label.config(text="Capturando imagem...", foreground="blue")
+            calibration_window.update()
             
-            frame_count = 0
-            while not stop_preview["flag"]:
-                # Reaplicar configurações a cada frame para que sliders façam efeito
-                apply_camera_settings(cam)
+            for _ in range(5):
+                cam.read()
+                time.sleep(0.1)
+            
+            # Capturar frame
+            ret, frame = cam.read()
+            cam.release()
+            
+            if ret:
+                # Redimensionar para caber no canvas
+                frame = cv.resize(frame, (480, 360))
+                frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
                 
-                ret, frame = cam.read()
-                if ret:
-                    # Redimensionar para caber no canvas
-                    frame = cv.resize(frame, (480, 360))
-                    frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
-                    
-                    # Criar imagem PIL
-                    pil_image = Image.fromarray(frame)
-                    current_image["tk"] = ImageTk.PhotoImage(pil_image)
-                    
-                    # Limpar canvas e desenhar nova imagem
-                    canvas.delete("all")
-                    canvas.create_image(240, 180, image=current_image["tk"])
-                    
-                    frame_count += 1
+                # Criar imagem PIL
+                pil_image = Image.fromarray(frame)
+                current_image["tk"] = ImageTk.PhotoImage(pil_image)
                 
-                time.sleep(0.05)  # ~20 FPS
+                # Limpar canvas e desenhar imagem
+                canvas.delete("all")
+                canvas.create_image(240, 180, image=current_image["tk"])
+                
+                msg_label.config(text="Imagem capturada com sucesso", foreground="green")
+            else:
+                msg_label.config(text="Erro ao capturar imagem", foreground="red")
+                
         except Exception as e:
-            print(f"Erro na atualização da preview: {e}")
-        finally:
-            try:
-                cam.release()
-            except:
-                pass
-    
-    def start_preview():
-        """Inicia a thread de preview"""
-        stop_preview["flag"] = False
-        if update_threads["preview"] is None or not update_threads["preview"].is_alive():
-            update_threads["preview"] = threading.Thread(target=update_preview, daemon=True)
-            update_threads["preview"].start()
-    
-    def stop_preview_thread():
-        """Para a thread de preview"""
-        stop_preview["flag"] = True
-        if update_threads["preview"]:
-            update_threads["preview"].join(timeout=1)
+            msg_label.config(text=f"Erro: {str(e)}", foreground="red")
+            print(f"Erro na captura: {e}")
     
     def save_settings():
         """Salva as configurações no cfg.json"""
@@ -850,18 +834,13 @@ def abrir_calibracao_camera(self):
     button_frame = ttk.Frame(calibration_window)
     button_frame.pack(fill=tk.X, pady=10, padx=10)
     
+    ttk.Button(button_frame, text="Pré-visualizar Imagem", command=capture_preview).pack(side=tk.LEFT, padx=5)
     ttk.Button(button_frame, text="Salvar Configurações", command=save_settings).pack(side=tk.LEFT, padx=5)
-    ttk.Button(button_frame, text="Fechar", command=lambda: [stop_preview_thread(), calibration_window.destroy()]).pack(side=tk.LEFT, padx=5)
+    ttk.Button(button_frame, text="Fechar", command=calibration_window.destroy).pack(side=tk.LEFT, padx=5)
     
-    # Inicia preview ao abrir a janela
-    start_preview()
-    
-    # Para preview ao fechar a janela
-    def on_closing():
-        stop_preview_thread()
-        calibration_window.destroy()
-    
-    calibration_window.protocol("WM_DELETE_WINDOW", on_closing)
+    # Label para mensagens de status
+    msg_label = ttk.Label(calibration_window, text="Clique em 'Pré-visualizar Imagem' para ver a câmera", foreground="gray")
+    msg_label.pack(fill=tk.X, padx=10, pady=5)
 
 # --- Classes utilitárias (de camera.py e cnc_controller.py) ---
 class Camera:
