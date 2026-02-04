@@ -15,27 +15,52 @@ import matplotlib.patches as patches
 import subprocess
 import shutil
 
-def configure_camera(cam):
+def configure_camera(cam, use_cfg=True):
     """
     Configura os parâmetros da câmera para captura padronizada.
     
     Parâmetros:
     - cam: objeto cv.VideoCapture
+    - use_cfg: se True, carrega configurações do cfg.json
     """
     # Resolução 1080p
     cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
     cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
     
-    # Desligar auto exposure (valor pode variar!)
-    cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 0.25)  # manual
-    cam.set(cv.CAP_PROP_EXPOSURE, -6)         # ajuste empírico
+    # Carrega configurações do cfg.json se disponível
+    settings = {
+        "auto_exposure": False,
+        "exposure": -6,
+        "auto_wb": False,
+        "wb_temperature": 4500,
+        "auto_focus": False,
+        "focus": 100,
+        "brightness": 128,
+        "contrast": 128,
+        "saturation": 128,
+        "gain": 50
+    }
     
-    # Desligar auto white balance
-    cam.set(cv.CAP_PROP_AUTO_WB, 0)           # manual
-    cam.set(cv.CAP_PROP_WB_TEMPERATURE, 4500) # temperatura em Kelvin
+    if use_cfg:
+        try:
+            with open("cfg.json", "r") as f:
+                cfg_data = json.load(f)
+                if "camera_settings" in cfg_data:
+                    settings.update(cfg_data["camera_settings"])
+        except Exception:
+            pass
     
-    # Desligar auto focus
-    cam.set(cv.CAP_PROP_AUTOFOCUS, 0)         # manual
+    # Aplicar configurações
+    cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 0.25 if not settings["auto_exposure"] else 1.0)
+    cam.set(cv.CAP_PROP_EXPOSURE, settings["exposure"])
+    cam.set(cv.CAP_PROP_AUTO_WB, 0 if not settings["auto_wb"] else 1)
+    cam.set(cv.CAP_PROP_WB_TEMPERATURE, settings["wb_temperature"])
+    cam.set(cv.CAP_PROP_AUTOFOCUS, 0 if not settings["auto_focus"] else 1)
+    cam.set(cv.CAP_PROP_FOCUS, settings["focus"])
+    cam.set(cv.CAP_PROP_BRIGHTNESS, settings["brightness"])
+    cam.set(cv.CAP_PROP_CONTRAST, settings["contrast"])
+    cam.set(cv.CAP_PROP_SATURATION, settings["saturation"])
+    cam.set(cv.CAP_PROP_GAIN, settings["gain"])
 
 def multi_images_capture():
     """
@@ -600,6 +625,234 @@ def criar_interface_gerar_pontos(self):
         gerar_pontos_adensados(self, step_x=step_x, step_y=step_y)
     btn = ttk.Button(frame, text="Gerar Pontos Adensados", command=on_gerar)
     btn.pack(side=tk.LEFT)
+    
+    # Botão de calibração de câmera
+    btn_calibrar = ttk.Button(frame, text="Calibrar Câmera", command=lambda: abrir_calibracao_camera(self))
+    btn_calibrar.pack(side=tk.LEFT, padx=(10, 0))
+
+def abrir_calibracao_camera(self):
+    """
+    Abre janela de calibração de câmera com sliders para todos os parâmetros.
+    """
+    from tkinter import ttk, Scale
+    from PIL import Image, ImageTk
+    import threading
+    import time
+    
+    # Carrega configurações atuais
+    try:
+        with open("cfg.json", "r") as f:
+            cfg_data = json.load(f)
+            camera_settings = cfg_data.get("camera_settings", {})
+    except Exception:
+        camera_settings = {}
+    
+    # Valores padrão
+    defaults = {
+        "auto_exposure": False,
+        "exposure": -6,
+        "auto_wb": False,
+        "wb_temperature": 4500,
+        "auto_focus": False,
+        "focus": 100,
+        "brightness": 128,
+        "contrast": 128,
+        "saturation": 128,
+        "gain": 50
+    }
+    
+    for key, val in defaults.items():
+        if key not in camera_settings:
+            camera_settings[key] = val
+    
+    # Cria janela de calibração
+    calibration_window = tk.Toplevel(self.root)
+    calibration_window.title("Calibração de Câmera")
+    calibration_window.geometry("1200x700")
+    
+    # Frame esquerdo para sliders
+    left_frame = ttk.Frame(calibration_window)
+    left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=False, padx=10, pady=10)
+    
+    ttk.Label(left_frame, text="Parâmetros da Câmera", font=("Arial", 12, "bold")).pack()
+    
+    # Dicionário para armazenar valores dos sliders
+    slider_values = {}
+    auto_flags = {}
+    
+    # Configuração dos parâmetros
+    params = [
+        ("exposure", "Exposure", -13, 0, -6),
+        ("wb_temperature", "White Balance (K)", 2500, 6500, 4500),
+        ("focus", "Focus", 0, 255, 100),
+        ("brightness", "Brightness", 0, 255, 128),
+        ("contrast", "Contrast", 0, 255, 128),
+        ("saturation", "Saturation", 0, 255, 128),
+        ("gain", "Gain", 0, 100, 50),
+    ]
+    
+    # Lista para rastrear threads de atualização
+    update_threads = {"preview": None}
+    stop_preview = {"flag": False}
+    
+    for param_key, label, min_val, max_val, default_val in params:
+        param_frame = ttk.Frame(left_frame)
+        param_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(param_frame, text=label, width=20).pack(side=tk.LEFT)
+        
+        # Slider
+        slider_var = tk.DoubleVar(value=camera_settings.get(param_key, default_val))
+        slider_values[param_key] = slider_var
+        slider = Scale(param_frame, from_=min_val, to=max_val, orient=tk.HORIZONTAL, 
+                      variable=slider_var, length=250)
+        slider.pack(side=tk.LEFT, padx=5)
+        
+        # Valor exibido
+        value_label = ttk.Label(param_frame, text=str(int(slider_var.get())), width=5)
+        value_label.pack(side=tk.LEFT, padx=5)
+        
+        def update_label(val, label_widget=value_label):
+            label_widget.config(text=str(int(float(val))))
+        
+        slider.config(command=update_label)
+    
+    # Parâmetros com botão Auto
+    auto_params = [
+        ("auto_exposure", "Auto Exposure", "exposure"),
+        ("auto_wb", "Auto White Balance", "wb_temperature"),
+        ("auto_focus", "Auto Focus", "focus"),
+    ]
+    
+    auto_frame = ttk.LabelFrame(left_frame, text="Modo Automático", padding=10)
+    auto_frame.pack(fill=tk.X, pady=10)
+    
+    for auto_key, label, linked_param in auto_params:
+        checkbox_var = tk.BooleanVar(value=camera_settings.get(auto_key, False))
+        auto_flags[auto_key] = checkbox_var
+        checkbox = ttk.Checkbutton(auto_frame, text=label, variable=checkbox_var)
+        checkbox.pack(anchor=tk.W)
+    
+    # Frame direito para preview
+    right_frame = ttk.Frame(calibration_window)
+    right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+    
+    ttk.Label(right_frame, text="Preview da Câmera", font=("Arial", 12, "bold")).pack()
+    
+    canvas = tk.Canvas(right_frame, width=480, height=360, bg="black")
+    canvas.pack(fill=tk.BOTH, expand=True, pady=10)
+    
+    # Variáveis para armazenar foto
+    current_image = {"pil": None, "tk": None}
+    
+    def apply_camera_settings():
+        """Aplica as configurações atuais da câmera"""
+        try:
+            cam = cv.VideoCapture(0, cv.CAP_DSHOW)
+            if cam.isOpened():
+                cam.set(cv.CAP_PROP_FRAME_WIDTH, 1920)
+                cam.set(cv.CAP_PROP_FRAME_HEIGHT, 1080)
+                
+                # Aplicar auto flags
+                cam.set(cv.CAP_PROP_AUTO_EXPOSURE, 1.0 if auto_flags["auto_exposure"].get() else 0.25)
+                cam.set(cv.CAP_PROP_AUTO_WB, 1 if auto_flags["auto_wb"].get() else 0)
+                cam.set(cv.CAP_PROP_AUTOFOCUS, 1 if auto_flags["auto_focus"].get() else 0)
+                
+                # Aplicar sliders
+                cam.set(cv.CAP_PROP_EXPOSURE, int(slider_values["exposure"].get()))
+                cam.set(cv.CAP_PROP_WB_TEMPERATURE, int(slider_values["wb_temperature"].get()))
+                cam.set(cv.CAP_PROP_FOCUS, int(slider_values["focus"].get()))
+                cam.set(cv.CAP_PROP_BRIGHTNESS, int(slider_values["brightness"].get()))
+                cam.set(cv.CAP_PROP_CONTRAST, int(slider_values["contrast"].get()))
+                cam.set(cv.CAP_PROP_SATURATION, int(slider_values["saturation"].get()))
+                cam.set(cv.CAP_PROP_GAIN, int(slider_values["gain"].get()))
+                
+                return cam
+        except Exception as e:
+            print(f"Erro ao aplicar configurações: {e}")
+        return None
+    
+    def update_preview():
+        """Atualiza a preview da câmera em tempo real"""
+        cam = apply_camera_settings()
+        if not cam:
+            return
+        
+        try:
+            while not stop_preview["flag"]:
+                ret, frame = cam.read()
+                if ret:
+                    # Redimensionar para caber no canvas
+                    frame = cv.resize(frame, (480, 360))
+                    frame = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
+                    
+                    pil_image = Image.fromarray(frame)
+                    current_image["pil"] = pil_image
+                    current_image["tk"] = ImageTk.PhotoImage(pil_image)
+                    
+                    canvas.create_image(0, 0, image=current_image["tk"], anchor=tk.NW)
+                
+                time.sleep(0.1)
+        except Exception as e:
+            print(f"Erro na atualização da preview: {e}")
+        finally:
+            cam.release()
+    
+    def start_preview():
+        """Inicia a thread de preview"""
+        stop_preview["flag"] = False
+        if update_threads["preview"] is None or not update_threads["preview"].is_alive():
+            update_threads["preview"] = threading.Thread(target=update_preview, daemon=True)
+            update_threads["preview"].start()
+    
+    def stop_preview_thread():
+        """Para a thread de preview"""
+        stop_preview["flag"] = True
+        if update_threads["preview"]:
+            update_threads["preview"].join(timeout=1)
+    
+    def save_settings():
+        """Salva as configurações no cfg.json"""
+        try:
+            with open("cfg.json", "r") as f:
+                cfg_data = json.load(f)
+            
+            cfg_data["camera_settings"] = {
+                "auto_exposure": auto_flags["auto_exposure"].get(),
+                "exposure": int(slider_values["exposure"].get()),
+                "auto_wb": auto_flags["auto_wb"].get(),
+                "wb_temperature": int(slider_values["wb_temperature"].get()),
+                "auto_focus": auto_flags["auto_focus"].get(),
+                "focus": int(slider_values["focus"].get()),
+                "brightness": int(slider_values["brightness"].get()),
+                "contrast": int(slider_values["contrast"].get()),
+                "saturation": int(slider_values["saturation"].get()),
+                "gain": int(slider_values["gain"].get()),
+            }
+            
+            with open("cfg.json", "w") as f:
+                json.dump(cfg_data, f, indent=4)
+            
+            msg.showinfo("Sucesso", "Configurações de câmera salvas com sucesso!")
+        except Exception as e:
+            msg.showerror("Erro", f"Erro ao salvar configurações: {e}")
+    
+    # Frame para botões
+    button_frame = ttk.Frame(calibration_window)
+    button_frame.pack(fill=tk.X, pady=10, padx=10)
+    
+    ttk.Button(button_frame, text="Salvar Configurações", command=save_settings).pack(side=tk.LEFT, padx=5)
+    ttk.Button(button_frame, text="Fechar", command=lambda: [stop_preview_thread(), calibration_window.destroy()]).pack(side=tk.LEFT, padx=5)
+    
+    # Inicia preview ao abrir a janela
+    start_preview()
+    
+    # Para preview ao fechar a janela
+    def on_closing():
+        stop_preview_thread()
+        calibration_window.destroy()
+    
+    calibration_window.protocol("WM_DELETE_WINDOW", on_closing)
 
 # --- Classes utilitárias (de camera.py e cnc_controller.py) ---
 class Camera:

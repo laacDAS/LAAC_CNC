@@ -1,6 +1,18 @@
 {
     "port": "COM3",
     "baudrate": 115200,
+    "camera_settings": {
+        "auto_exposure": false,
+        "exposure": -6,
+        "auto_wb": false,
+        "wb_temperature": 4500,
+        "auto_focus": false,
+        "focus": 100,
+        "brightness": 128,
+        "contrast": 128,
+        "saturation": 128,
+        "gain": 50
+    },
     "Room A": [
               {
             "id": "A01",

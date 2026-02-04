@@ -8,7 +8,8 @@ import json
 from functions import (
     log, update_status, update_progress, update_image,
     signal_handler, cancel, finalize, send_grbl, wait_for_idle,
-    get_image, start_process, run_process, criar_interface_gerar_pontos
+    get_image, start_process, run_process, criar_interface_gerar_pontos,
+    abrir_calibracao_camera
 )
 
 
