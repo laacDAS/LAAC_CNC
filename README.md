@@ -5,7 +5,7 @@ Bem-vindo ao projeto de automação de uma máquina CNC (Comando Numérico Compu
 ---
 
 ## 📝 Sobre o Projeto  
-Este trabalho de conclusão de curso desenvolve um sistema de automação para uma **máquina CNC** localizada em uma **câmara de simulação de ambientes**. O objetivo é programar a CNC para percorrer uma mesa de fenotipagem, seguindo um caminho planta a planta, capturando imagens detalhadas para análise fenotípica.  
+Este trabalho de conclusão de curso desenvolve um sistema de automação para uma **máquina CNC** localizada em uma **câmara de simulação de ambientes**. O objetivo é programar a CNC para percorrer uma mesa de fenotipagem, seguindo um caminho planta a planta, capturando imagens detalhadas para análise fenotípica.
 
 💡 **Finalidade:**  
 - Automatizar a captura de imagens de plantas em um ambiente controlado;  
@@ -25,7 +25,7 @@ Este trabalho de conclusão de curso desenvolve um sistema de automação para u
 ## 🛠️ Tecnologias Utilizadas  
 | Tecnologia       | Função                          |  
 |-------------------|---------------------------------|  
-| **CNC**          | Movimento preciso na mesa       |  
+| **GRBL**          | Movimento preciso na mesa       |  
 | **Arduino Mega** | Controle e programação |  
 | **Câmera**       | Captura de imagens das plantas  |  
 | **Python**       | Scripts de automação  |  
@@ -70,8 +70,12 @@ Este trabalho de conclusão de curso desenvolve um sistema de automação para u
 
 ---
 
+<<<<<<< HEAD
 ## 🤝 Contribuições  
 Este é um projeto acadêmico ainda fechado. No futuro, sugestões serão bem-vindas!  
+=======
+## 🤝 Contribuições   
+>>>>>>> aa7961e74585ca964be1f15370de7d75106035d4
 - Abra uma *issue* para reportar problemas ou ideias.  
 - Faça um *fork* e envie um *pull request* com melhorias.  
 
@@ -85,6 +89,7 @@ Este é um projeto acadêmico ainda fechado. No futuro, sugestões serão bem-vi
 - [Instagram Spectral Int](https://www.instagram.com/spectral_int/)
 
 ---
+<<<<<<< HEAD
 
 ## 💪 Equipe  
 - **Autor:** [Aline Malta - UFV]  
@@ -98,3 +103,5 @@ Este é um projeto acadêmico ainda fechado. No futuro, sugestões serão bem-vi
 *Projeto desenvolvido em 2025 para o TCC na área de automação e agricultura de precisão.*
 
 ---
+=======
+>>>>>>> aa7961e74585ca964be1f15370de7d75106035d4

@@ -8,14 +8,24 @@ import json
 from functions import (
     log, update_status, update_progress, update_image,
     signal_handler, cancel, finalize, send_grbl, wait_for_idle,
+<<<<<<< HEAD
     get_image, start_process, run_process
 )
 
+=======
+    get_image, start_process, run_process, criar_interface_gerar_pontos
+)
+
+
+>>>>>>> aa7961e74585ca964be1f15370de7d75106035d4
 class App:
     def __init__(self, root):
         self.root = root
         self.root.title("Controle GRBL e Captura de Imagens")
         self.root.geometry("1000x700")
+
+        # Adiciona interface para geração de pontos adensados
+        criar_interface_gerar_pontos(self)
 
         # Frame principal para organizar o layout
         self.main_frame = ttk.Frame(root)
@@ -86,6 +96,14 @@ class App:
             self.button_frame, text="Cancelar", command=lambda: cancel(self), state=tk.DISABLED)
         self.cancel_button.pack(side=tk.LEFT, padx=5)
 
+        # Botão Captura Adensada
+        from functions import start_dense_process
+        self.captura_adensada_button = ttk.Button(
+            self.button_frame,
+            text="Captura Adensada",
+            command=lambda: start_dense_process(self)
+        )
+        self.captura_adensada_button.pack(side=tk.LEFT, padx=5)
         # Frame para visualização da imagem (direita)
         self.image_frame = ttk.Frame(self.main_frame)
         self.image_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -114,7 +132,15 @@ class App:
         for plant in plants:
             self.plant_listbox.insert(tk.END, plant['id'])
 
+<<<<<<< HEAD
 if __name__ == "__main__":
     root = tk.Tk()
     app = App(root)
     root.mainloop()
+=======
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = App(root)
+    root.mainloop()
+>>>>>>> aa7961e74585ca964be1f15370de7d75106035d4
